@@ -36,6 +36,12 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *******************************************************************************/
+
+/* HOWTO Remote:
+ *  sudo sshfs -o allow_other root@10.44.2.224:/ /home/dave/mnt
+ *  jesd_eye_scan /home/dave/mnt
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -145,7 +151,7 @@ void text_view_delete(void)
 	}
 }
 
-int get_interface(const char *path) {
+int get_interface(const char *path, const char *index) {
 
 	FILE *fp;
 	char cmd[512];
@@ -157,7 +163,9 @@ int get_interface(const char *path) {
 	if (!path || !remote)
 		path = " ";
 
-	ret = snprintf(cmd, 512, "find %s/sys/bus/platform/devices -name *axi-jesd204b-rx* 2>/dev/null", path);
+	ret = snprintf(cmd, 512,
+		       "find %s/sys/bus/platform/devices -name *axi-jesd204b-rx%s* 2>/dev/null",
+			path, index ? index : "");
 	if (ret < 0)
 		return -ENODEV;
 
@@ -174,7 +182,9 @@ int get_interface(const char *path) {
 
 		pclose(fp);
 
-		ret = snprintf(cmd, 512, "find %s/sys/bus/platform/devices -name *axi-jesd-gt-rx* 2>/dev/null", path);
+		ret = snprintf(cmd, 512,
+			       "find %s/sys/bus/platform/devices -name *axi-jesd-gt-rx%s* 2>/dev/null",
+				path, index ? index : "");
 		if (ret < 0)
 			return -ENODEV;
 
@@ -873,8 +883,9 @@ int main(int argc, char *argv[])
 
 	remote = argc > 1;
 
-	if (get_interface(argv[1]))
+	if (get_interface(argv[1], argv[2]))
 		return EXIT_FAILURE;
+
 	printf("Found %s\n", jesd_interface_path);
 	printf("Found %s\n", gt_interface_path);
 
