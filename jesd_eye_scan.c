@@ -73,6 +73,7 @@ unsigned es_hsize;
 unsigned es_vsize;
 unsigned cdr_data_width;
 unsigned new_interface = 0;
+unsigned remote = 0;
 
 GtkBuilder *builder;
 GtkWidget *main_window;
@@ -144,14 +145,23 @@ void text_view_delete(void)
 	}
 }
 
-int get_interface(void) {
+int get_interface(const char *path) {
 
 	FILE *fp;
+	char cmd[512];
+	int ret;
 
 	/* flushes all open output streams */
 	fflush(NULL);
 
-	fp = popen("find /sys/bus/platform/devices -name *axi-jesd204b-rx* 2>/dev/null", "r");
+	if (!path || !remote)
+		path = " ";
+
+	ret = snprintf(cmd, 512, "find %s/sys/bus/platform/devices -name *axi-jesd204b-rx* 2>/dev/null", path);
+	if (ret < 0)
+		return -ENODEV;
+
+	fp = popen(cmd, "r");
 	if (fp == NULL) {
 		fprintf(stderr, "can't execute find\n");
 		return -errno;
@@ -164,7 +174,11 @@ int get_interface(void) {
 
 		pclose(fp);
 
-		fp = popen("find /sys/bus/platform/devices -name *axi-jesd-gt-rx* 2>/dev/null", "r");
+		ret = snprintf(cmd, 512, "find %s/sys/bus/platform/devices -name *axi-jesd-gt-rx* 2>/dev/null", path);
+		if (ret < 0)
+			return -ENODEV;
+
+		fp = popen(cmd, "r");
 		if (fp == NULL) {
 			fprintf(stderr, "can't execute find\n");
 			return -errno;
@@ -382,7 +396,6 @@ int plot(char *file, unsigned lane, unsigned p, char *file_png)
 			((float)(i / es_hsize) - (es_vsize / 2)),
 			((float)(i % es_hsize) - (es_hsize / 2)) / (es_hsize - 1),
 			calc_ber(buf[i], p, cdr_data_width));
-
 	}
 
 	fprintf(gp, "e\n");
@@ -428,7 +441,20 @@ int get_eye_data(char *filename, char *basedir, char *filename_out)
 		free(buf);
 		return -errno;
 	}
-	ret = fread(buf, sizeof(*buf), cnt, sysfsfp);
+
+	if (!remote) {
+		ret = fread(buf, sizeof(*buf), cnt, sysfsfp);
+	} else {
+		/* odd bug somewhere when running over sshfs
+		 * fread() doesn't return error or short read
+		 * but there are 4k blocks of zeros in between
+		 */
+		int i;
+		ret = 0;
+		for (i = 0 ; i < cnt; i +=  64)
+			ret += fread(&buf[i], sizeof(*buf),
+				     ((cnt - i) > 64) ? 64 : cnt - 1, sysfsfp);
+	}
 	fclose(sysfsfp);
 
 	if (ret != cnt) {
@@ -845,7 +871,9 @@ int main(int argc, char *argv[])
 	int i, ret, cnt = 0;
 	char temp[128];
 
-	if (get_interface())
+	remote = argc > 1;
+
+	if (get_interface(argv[1]))
 		return EXIT_FAILURE;
 	printf("Found %s\n", jesd_interface_path);
 	printf("Found %s\n", gt_interface_path);
