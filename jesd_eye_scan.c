@@ -58,6 +58,7 @@
 #include <math.h>
 #include <time.h>
 #include <pthread.h>
+#include <ctype.h>
 
 #include <gtk/gtk.h>
 #include <gtk/gtkx.h>
@@ -161,7 +162,7 @@ int get_interface(const char *path, const char *index) {
 	fflush(NULL);
 
 	if (!path || !remote)
-		path = " ";
+		path = "";
 
 	ret = snprintf(cmd, 512,
 		       "find %s/sys/bus/platform/devices -name *axi-jesd204b-rx%s* 2>/dev/null",
@@ -878,12 +879,39 @@ int main(int argc, char *argv[])
 	GtkWidget *view;
 	GtkImage *logo;
 	struct stat buf;
-	int i, ret, cnt = 0;
+	int i, ret, c, cnt = 0;
 	char temp[128];
+	char *path = NULL;
+	char *dev = NULL;
+	opterr = 0;
 
-	remote = argc > 1;
+	while ((c = getopt (argc, argv, "d:p:")) != -1)
+		switch (c)
+		{
+		case 'd':
+			dev = optarg;
+			break;
+		case 'p':
+			path = optarg;
+			remote = 1;
+			break;
+		case '?':
+			if (optopt == 'd'|| optopt == 'p')
+			fprintf (stderr, "Option -%c requires an argument.\n", optopt);
+			else if (isprint (optopt))
+			fprintf (stderr, "Unknown option `-%c'.\n%s [-p PATH] [-d DEVICEINDEX]\n",
+				 optopt, argv[0]);
+			else
+			fprintf (stderr,
+				"Unknown option character `\\x%x'.\n",
+				optopt);
+			return 1;
+		default:
+			abort ();
+		}
 
-	if (get_interface(argv[1], argv[2]))
+
+	if (get_interface(path, dev))
 		return EXIT_FAILURE;
 
 	printf("Found %s\n", jesd_interface_path);
