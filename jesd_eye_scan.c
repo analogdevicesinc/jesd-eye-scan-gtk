@@ -38,8 +38,8 @@
 *******************************************************************************/
 
 /* HOWTO Remote:
- *  sudo sshfs -o allow_other root@10.44.2.224:/ /home/dave/mnt
- *  jesd_eye_scan /home/dave/mnt
+ *  sudo sshfs -o allow_other -o sync_read root@10.44.2.224:/ /home/dave/mnt
+ *  jesd_eye_scan -p /home/dave/mnt
  */
 
 #include <stdio.h>
@@ -81,6 +81,8 @@ unsigned es_vsize;
 unsigned cdr_data_width;
 unsigned new_interface = 0;
 unsigned remote = 0;
+unsigned lpm = 0;
+
 
 GtkBuilder *builder;
 GtkWidget *main_window;
@@ -214,7 +216,7 @@ int get_interface(const char *path, const char *index) {
 	return -ENODEV;
 }
 
-void print_output_sys(void *err, const char *str, ...)
+int print_output_sys(void *err, const char *str, ...)
 {
 	va_list args;
 	char buf[250];
@@ -235,15 +237,16 @@ void print_output_sys(void *err, const char *str, ...)
 		gtk_text_buffer_insert_with_tags_by_name(buffer, &iter,
 							 buf, -1, "bold",
 							 "lmarg", NULL);
-	} else {
-		return;
-	};
+	}
+
+	/* Fix warning: variable ‘len’ set but not used [-Wunused-but-set-variable] */
+	return len;
 }
 
 static void analyse(unsigned long long *data, unsigned int width,
 		    unsigned int height, FILE * gp)
 {
-	unsigned long long error_count;
+	unsigned *data_u32 = (unsigned *)data;
 	unsigned int x, y;
 	int xmin, xmax;
 	int ymin, ymax;
@@ -252,8 +255,8 @@ static void analyse(unsigned long long *data, unsigned int width,
 	xmax = -1;
 	y = (height + 1) / 2;
 	for (x = 0; x < width; x++) {
-		error_count = data[y * width + x] & 0xFFFF0000FFFF;
-		if (!error_count) {
+		if (!(lpm ? data_u32[y * width + x] & 0x0000FFFF :
+			data[y * width + x] & 0xFFFF0000FFFF)) {
 			if (xmin == -1)
 				xmin = x;
 			xmax = x;
@@ -264,8 +267,8 @@ static void analyse(unsigned long long *data, unsigned int width,
 	ymax = -1;
 	x = (width + 1) / 2;
 	for (y = 0; y < height; y++) {
-		error_count = data[y * width + x] & 0xFFFF0000FFFF;
-		if (!error_count) {
+		if (!(lpm ? data_u32[y * width + x] & 0x0000FFFF :
+			data[y * width + x] & 0xFFFF0000FFFF)) {
 			if (ymin == -1)
 				ymin = y;
 			ymax = y;
@@ -278,14 +281,6 @@ static void analyse(unsigned long long *data, unsigned int width,
 	xmax -= x;
 	ymin -= y;
 	ymax -= y;
-
-	/*fprintf(gp, "set arrow 1 from %f,%f to %f,%f heads front nofilled " \
-	   "linetype 3 linecolor rgb \"white\" " \
-	   "size screen 0.008,90.000,90.000\n",
-	   (float)xmin / 129.0f, 0.0f, (float)xmax / 129.0f, 0.0f);
-	   fprintf(gp, "set arrow 2 from %f,%f to %f,%f heads front nofilled " \
-	   "linetype 3 linecolor rgb \"white\" " \
-	   "size screen 0.008,90.000,90.000\n", 0.0, (float)ymin, 0.0f, (float)ymax); */
 
 	fprintf(gp, "set label 'Eye-Opening:' at -0.48,-90 front\n");
 	fprintf(gp, "set label 'H: %.3f (UI)' at -0.48,-105 front\n",
@@ -304,18 +299,29 @@ double calc_ber(unsigned long long smpl, unsigned prescale,
 	unsigned long long err_ut0, err_ut1, cnt_ut0, cnt_ut1;
 	double ber;
 
-	err_ut0 = smpl & 0xFFFF;
-	err_ut1 = (smpl >> 32) & 0xFFFF;
-	cnt_ut0 = (smpl >> 16) & 0xFFFF;
-	cnt_ut1 = (smpl >> 48) & 0xFFFF;
+	if (lpm) {
+		err_ut0 = smpl & 0xFFFF;
+		cnt_ut0 = (smpl >> 16) & 0xFFFF;
 
-	if ((err_ut0 + err_ut1) == 0)
-		ber =
-		    1 / (double)((width << (1 + prescale)) *
-				 (cnt_ut0 + cnt_ut1));
-	else
-		ber = (err_ut0 * cnt_ut1 + err_ut1 * cnt_ut0) /
-		    (double)(2 * (width << (1 + prescale)) * cnt_ut0 * cnt_ut1);
+		if ((err_ut0) == 0)
+			ber = 1 / (double)((width << (1 + prescale)) * cnt_ut0);
+		else
+			ber = err_ut0 / (double)((width << (1 + prescale)) * cnt_ut0);
+
+	} else {
+		err_ut0 = smpl & 0xFFFF;
+		err_ut1 = (smpl >> 32) & 0xFFFF;
+		cnt_ut0 = (smpl >> 16) & 0xFFFF;
+		cnt_ut1 = (smpl >> 48) & 0xFFFF;
+
+		if ((err_ut0 + err_ut1) == 0)
+			ber =
+			1 / (double)((width << (1 + prescale)) *
+					(cnt_ut0 + cnt_ut1));
+		else
+			ber = (err_ut0 * cnt_ut1 + err_ut1 * cnt_ut0) /
+			(double)(2 * (width << (1 + prescale)) * cnt_ut0 * cnt_ut1);
+	}
 
 	return ber;
 }
@@ -334,6 +340,7 @@ int plot(char *file, unsigned lane, unsigned p, char *file_png)
 	static FILE *gp = NULL;
 	int ret, i, cnt;
 	unsigned long long *buf;
+	unsigned *buf_lpm;
 
 	FILE *pFile;
 
@@ -347,7 +354,9 @@ int plot(char *file, unsigned lane, unsigned p, char *file_png)
 
 	cnt = es_hsize * es_vsize;	/* X,Y */
 
-	buf = malloc(cnt * sizeof(*buf));
+	buf = malloc(cnt * (lpm ? 4 : 8));
+	buf_lpm = (unsigned *) buf;
+
 	if (buf == NULL)
 		exit(EXIT_FAILURE);
 
@@ -366,11 +375,14 @@ int plot(char *file, unsigned lane, unsigned p, char *file_png)
 	fprintf(gp, "set ylabel 'Vertical Offset (CODES)'\n");
 	fprintf(gp, "set xlabel 'Horizontal Offset (UI)'\n");
 	fprintf(gp, "set palette rgbformulae 7,5,15\n");
-	fprintf(gp, "set title 'Xilinx 2D Statistical Eye Scan : "
-			"JESD204B Lane %i @ %.2f Gbps (Max BER %.1e)'\n",
+	fprintf(gp, "set title '"
+			"JESD204B Lane%i @ %.2f Gbps %s (Max BER %.1e)'\n",
 			 lane,
-			 (double)get_lane_rate(lane) / 1000000000,
+			 (double)get_lane_rate(lane) / 1000000000, lpm ? "LPM" : "DFE",
 			 calc_ber(0xFFFF0000FFFF0000, p, cdr_data_width));
+
+	fprintf(gp, "set label 'Xilinx 2D Statistical Eye Scan' at graph 0.0,1.2 left front\n");
+
 	fprintf(gp, "set grid xtics ytics front lc rgb 'grey'\n");
 	fprintf(gp, "set cblabel 'BER 10E'\n");
 	fprintf(gp, "set cntrparam levels incremental -1,-1,%i\n",
@@ -386,7 +398,7 @@ int plot(char *file, unsigned lane, unsigned p, char *file_png)
 	fprintf(gp, "set label 'MASK' at 0,0 center front tc rgb 'white'\n");
 
 	pFile = fopen(file, "r");
-	ret = fread(buf, sizeof(*buf), cnt, pFile);
+	ret = fread(buf, lpm ? 4 : 8, cnt, pFile);
 	fclose(pFile);
 
 	if (ret != cnt) {
@@ -406,7 +418,7 @@ int plot(char *file, unsigned lane, unsigned p, char *file_png)
 		fprintf(gp, "%f %f %e\n",
 			((float)(i / es_hsize) - (es_vsize / 2)),
 			((float)(i % es_hsize) - (es_hsize / 2)) / (es_hsize - 1),
-			calc_ber(buf[i], p, cdr_data_width));
+			calc_ber(lpm ? buf_lpm[i] : buf[i], p, cdr_data_width));
 	}
 
 	fprintf(gp, "e\n");
@@ -442,7 +454,7 @@ int get_eye_data(char *filename, char *basedir, char *filename_out)
 	int ret = 0;
 	unsigned cnt = es_hsize * es_vsize;	/* X,Y */
 
-	buf = malloc(cnt * sizeof(*buf));
+	buf = malloc(cnt * (lpm ? 4 : 8));
 	if (buf == NULL)
 		return -ENOMEM;
 
@@ -453,19 +465,8 @@ int get_eye_data(char *filename, char *basedir, char *filename_out)
 		return -errno;
 	}
 
-	if (!remote) {
-		ret = fread(buf, sizeof(*buf), cnt, sysfsfp);
-	} else {
-		/* odd bug somewhere when running over sshfs
-		 * fread() doesn't return error or short read
-		 * but there are 4k blocks of zeros in between
-		 */
-		int i;
-		ret = 0;
-		for (i = 0 ; i < cnt; i +=  64)
-			ret += fread(&buf[i], sizeof(*buf),
-				     ((cnt - i) > 64) ? 64 : cnt - 1, sysfsfp);
-	}
+	ret = fread(buf, lpm ? 4 : 8, cnt, sysfsfp);
+
 	fclose(sysfsfp);
 
 	if (ret != cnt) {
@@ -480,7 +481,7 @@ int get_eye_data(char *filename, char *basedir, char *filename_out)
 		return -errno;
 	}
 
-	ret = fwrite(buf, sizeof(*buf), cnt, pFile);
+	ret = fwrite(buf, lpm ? 4 : 8, cnt, pFile);
 	fclose(pFile);
 	free(buf);
 
@@ -590,8 +591,11 @@ int read_laneinfo(char *basedir, unsigned lane)
 		if (pFile == NULL) {
 			return -errno;
 		}
-		ret += fscanf(pFile, "x%d,y%d CDRDW: %d\n", &lane_info[lane].ex, &lane_info[lane].ey,
-			&lane_info[lane].cdr_data_width);
+
+		lpm = 0;
+		ret += fscanf(pFile, "x%d,y%d CDRDW: %d LPM: %d\n", &lane_info[lane].ex, &lane_info[lane].ey,
+			&lane_info[lane].cdr_data_width, &lpm);
+
 		fclose(pFile);
 	}
 
