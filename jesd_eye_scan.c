@@ -59,6 +59,7 @@
 #include <time.h>
 #include <pthread.h>
 #include <ctype.h>
+#include <locale.h>
 
 #include <gtk/gtk.h>
 #include <gtk/gtkx.h>
@@ -917,6 +918,8 @@ int main(int argc, char *argv[])
 
 	if (get_interface(path, dev))
 		return EXIT_FAILURE;
+
+	setlocale(LC_NUMERIC, "C");
 
 	printf("Found %s\n", jesd_interface_path);
 	printf("Found %s\n", gt_interface_path);
