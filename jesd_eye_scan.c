@@ -1035,6 +1035,15 @@ GtkWidget* set_lable_text(GtkWidget *label, const char *text, const char *expect
 	return label;
 }
 
+void my_gtk_label_set_xalign (GtkLabel *label, float xalign)
+{
+	GValue val = G_VALUE_INIT;
+	g_value_init (&val, G_TYPE_FLOAT);
+	g_value_set_float (&val, xalign);
+	g_object_set_property (G_OBJECT (label), "xalign", &val);
+	g_value_unset (&val);
+}
+
 GtkWidget* set_per_lane_status(struct jesd204b_laneinfo *info, unsigned lanes)
 {
 	struct jesd204b_laneinfo *lane;
@@ -1072,7 +1081,7 @@ GtkWidget* set_per_lane_status(struct jesd204b_laneinfo *info, unsigned lanes)
 		if (i == 0) {
 			for (j = 0; j < 6; j++) {
 				label = set_lable_text(NULL, tab_lables[j], NULL, 0);
-				gtk_label_set_xalign (GTK_LABEL(label), 0);
+				my_gtk_label_set_xalign (GTK_LABEL(label), 0);
 				gtk_grid_attach (GTK_GRID (grid), label, i, j, 1, 1);
 			}
 		} else {
