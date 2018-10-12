@@ -42,6 +42,7 @@
  *  jesd_eye_scan -p /home/dave/mnt
  */
 
+#define _GNU_SOURCE
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -64,11 +65,6 @@
 #include <gtk/gtk.h>
 #include <gtk/gtkx.h>
 
-#define MAX_DEVICE_CORES
-
-char basedir[PATH_MAX];
-
-
 #define JESD204B_LANE_ENABLE	"enable"
 #define JESD204B_PRESCALE	"prescale"
 #define JESD204B_EYE_DATA	"eye_data"
@@ -77,10 +73,13 @@ char basedir[PATH_MAX];
 #define MAX_PRESCALE		31
 #define MAX_SYSFS_STRING_SIZE	32
 
-
 #define JESD204_DEVICE_NAME 	"axi-jesd204-"
 #define XCVR_DEVICE_NAME 	"axi-adxcvr-rx"
 
+#define PPM(x)			((x) / 1000000.0)
+#define CLOCK_ACCURACY		200
+
+char basedir[PATH_MAX];
 unsigned remote = 0;
 guint timer;
 
@@ -104,10 +103,7 @@ GtkWidget *tview;
 GtkTextBuffer *buffer;
 GtkTextIter start, end;
 GtkTextIter iter;
-
-//GtkTreeStore *treestore;
 GtkWidget *view;
-
 
 GtkWidget *link_state;
 GtkWidget *measured_link_clock;
@@ -120,7 +116,12 @@ GtkWidget *sysref_captured;
 GtkWidget *sysref_alignment_error;
 GtkWidget *external_reset;
 
+GdkColor color_red;
+GdkColor color_green;
+GdkColor color_orange;
+
 pthread_t work;
+GMutex *mutex;
 unsigned work_run = 1;
 unsigned is_first = 0;
 
@@ -168,7 +169,7 @@ struct jesd204b_xcvr_eyescan_info {
 
 	unsigned es_hsize;
 	unsigned es_vsize;
-	unsigned cdr_data_width;
+	unsigned long long cdr_data_width;
 	unsigned num_lanes;
 	unsigned lpm;
 	unsigned long lane_rate;
@@ -195,7 +196,6 @@ struct jesd204b_xcvr_eyescan_info eyescan_info;
 unsigned long long get_lane_rate(unsigned lane)
 {
 	return lane_info[lane].fc * 1000ULL;
-
 }
 
 void text_view_delete(void)
@@ -207,7 +207,6 @@ void text_view_delete(void)
 		gtk_text_buffer_get_iter_at_offset(buffer, &iter, 0);
 	}
 }
-
 
 #define JESD204_TREE_STORE_NEW_ROW_VAL(name, value)\
 {\
@@ -229,7 +228,7 @@ void text_view_delete(void)
 	gtk_tree_store_set(treestore, &child, COLUMN,  name, COLUMN2, value, -1);\
 }\
 
-static GtkTreeModel *create_and_fill_model(unsigned active_lanes)
+static int create_and_fill_model(unsigned active_lanes)
 {
 	GtkTreeStore *treestore;
 	GtkTreeIter toplevel, child;
@@ -301,7 +300,7 @@ static GtkTreeModel *create_and_fill_model(unsigned active_lanes)
 	gtk_tree_view_set_model(GTK_TREE_VIEW(view), GTK_TREE_MODEL(treestore));
 	g_object_unref(GTK_TREE_MODEL(treestore));
 
-	return GTK_TREE_MODEL(treestore);
+	return 0;
 }
 
 static GtkWidget *create_view_and_model(unsigned active_lanes)
@@ -338,7 +337,6 @@ char *get_full_device_path(const char *basedir, const char *device)
 
 	return path;
 }
-
 
 int get_devices(const char *path, const char *device, GtkWidget *device_select)
 {
@@ -500,8 +498,6 @@ double calc_ber(struct jesd204b_xcvr_eyescan_info *info,
 	return ber;
 }
 
-
-
 int plot(struct jesd204b_xcvr_eyescan_info *info, char *file, unsigned lane,
          unsigned p, char *file_png)
 {
@@ -517,6 +513,7 @@ int plot(struct jesd204b_xcvr_eyescan_info *info, char *file, unsigned lane,
 	}
 
 	if (gp == NULL) {
+		print_output_sys(stderr, "No Gnuplot found - Please install gnuplot-x11 !\n");
 		return -1;
 	}
 
@@ -530,6 +527,9 @@ int plot(struct jesd204b_xcvr_eyescan_info *info, char *file, unsigned lane,
 	}
 
 	if (file_png == NULL) {
+		/* This doesn't work for all versions of GTK/Gnuplot:
+		 * https://stackoverflow.com/questions/41209199/cannot-embed-gnuplot-x11-window-into-gtk3-socket
+		 */
 		fprintf(gp, "set term x11 window \"%x\"\n",
 		        (unsigned int)gtk_socket_get_id(GTK_SOCKET(sock)));
 		fprintf(gp, "set mouse nozoomcoordinates\n");
@@ -723,6 +723,8 @@ int read_laneinfo(const char *basedir, unsigned lane,
 	char temp[PATH_MAX];
 	int ret = 0;
 
+	memset(info, 0, sizeof(*info));
+
 	sprintf(temp, "%s/lane%d_info", basedir, lane);
 
 	pFile = fopen(temp, "r");
@@ -779,8 +781,6 @@ int read_laneinfo(const char *basedir, unsigned lane,
 	return ret;
 }
 
-
-
 int read_eyescan_info(const char *basedir,
                       struct jesd204b_xcvr_eyescan_info *info)
 {
@@ -792,16 +792,19 @@ int read_eyescan_info(const char *basedir,
 	pFile = fopen(temp, "r");
 
 	if (pFile == NULL) {
+		print_output_sys(stderr, "Failed to read JESD204 device file: %s\n",
+				 temp);
 		return -errno;
 	}
 
-	ret = fscanf(pFile, "x%d,y%d CDRDW: %d LPM: %d NL: %d LR: %lu\n",
+	ret = fscanf(pFile, "x%d,y%d CDRDW: %llu LPM: %d NL: %d LR: %lu\n",
 	             &info->es_hsize, &info->es_vsize, &info->cdr_data_width,
 	             &info->lpm, &info->num_lanes, &info->lane_rate);
 
 	fclose(pFile);
 
 	if (ret != 6) {
+		print_output_sys(stderr, "Failed to read full eyescan_info\n");
 		return -EINVAL;
 	}
 
@@ -819,20 +822,21 @@ int read_jesd204_status(const char *basedir,
 
 	sprintf(temp, "%s/status", basedir);
 
+	memset(info, 0, sizeof(*info));
+
 	pFile = fopen(temp, "r");
 
 	if (pFile == NULL) {
+		print_output_sys(stderr, "Failed to read JESD204 device file: %s\n",
+				 temp);
 		return -errno;
 	}
-
-	memset(info, 0, sizeof(*info));
 
 	ret = fscanf(pFile, "Link is %s\n", (char *)&info->link_state);
 	ret = fscanf(pFile, "Measured Link Clock: %s MHz\n",
 	             (char *)&info->measured_link_clock);
 	ret = fscanf(pFile, "Reported Link Clock: %s MHz\n",
 	             (char *)&info->reported_link_clock);
-
 
 	pos = ftell(pFile);
 	ret = fscanf(pFile, "Lane rate: %s MHz\n", (char *)&info->lane_rate);
@@ -860,12 +864,10 @@ int read_jesd204_status(const char *basedir,
 	ret = fscanf(pFile, "SYSREF alignment error: %s\n",
 	             (char *)&info->sysref_alignment_error);
 
-
 	fclose(pFile);
 
 	return ret;
 }
-
 
 void *worker(void *args)
 {
@@ -890,6 +892,8 @@ void *worker(void *args)
 		pmax = p;
 	}
 
+	pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+
 	for (p = pmin; p <= pmax; p++) {
 		gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progressbar1),
 		                              (float)(i++) / ((pmax - pmin) ? (pmax - pmin) : 1));
@@ -901,6 +905,7 @@ void *worker(void *args)
 	}
 
 	gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progressbar1), 1.0);
+
 	return 0;
 }
 
@@ -915,9 +920,7 @@ void save_plot_pressed_cb(GtkButton *button, gpointer user_data)
 
 	struct jesd204b_xcvr_eyescan_info *info = &eyescan_info;
 
-	item =
-	        gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT
-	                        (finished_eyes));
+	item = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(finished_eyes));
 
 	if (item == NULL) {
 		return;
@@ -964,7 +967,6 @@ void save_plot_pressed_cb(GtkButton *button, gpointer user_data)
 
 	free(item);
 	gtk_widget_destroy(dialog);
-
 }
 
 void show_pressed_cb(GtkButton *button, gpointer user_data)
@@ -1014,6 +1016,14 @@ void start_pressed_cb(GtkButton *button, gpointer user_data)
 	struct jesd204b_xcvr_eyescan_info *info = &eyescan_info;
 	int ret;
 
+	if (work) {
+		ret = pthread_tryjoin_np(work, NULL);
+		if (ret) {
+			print_output_sys(stderr, "Wait until previous run terminates\n");
+			return;
+		}
+	}
+
 	ret = read_eyescan_info(info->gt_interface_path, info);
 
 	if (ret) {
@@ -1031,6 +1041,9 @@ void start_pressed_cb(GtkButton *button, gpointer user_data)
 void terminate_pressed_cb(GtkButton *button, gpointer user_data)
 {
 	work_run = 0;
+	if (work) {
+		pthread_cancel(work);
+	}
 }
 
 void device_select_pressed_cb(GtkComboBoxText *combo_box, gpointer user_data)
@@ -1063,6 +1076,9 @@ void device_select_pressed_cb(GtkComboBoxText *combo_box, gpointer user_data)
 	if (ret) {
 		return;
 	}
+
+	gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(min_ber));
+	gtk_combo_box_text_remove_all(GTK_COMBO_BOX_TEXT(max_ber));
 
 	/* Populate min/max BER combo boxes */
 	for (i = 0; i <= MAX_PRESCALE; i++) {
@@ -1098,9 +1114,9 @@ GtkWidget *set_lable_text(GtkWidget *label, const char *text,
 	GdkColor color;
 
 	if (g_strcmp0(text, expected)) {
-		gdk_color_parse(invert ? "green" : "red", &color);
+		color = (invert ? color_green : color_red);
 	} else {
-		gdk_color_parse(invert ? "red" : "green", &color);
+		color = (invert ? color_red: color_green);
 	}
 
 	if (label) {
@@ -1172,17 +1188,17 @@ GtkWidget *set_per_lane_status(struct jesd204b_laneinfo *info, unsigned lanes)
 			if (i == 1) {
 				latency_ref = lane->k * lane->lane_latency_multiframes +
 				              lane->lane_latency_octets;
-				gdk_color_parse("green", &color);
+				color = color_green;
 			} else {
 				latency = lane->k * lane->lane_latency_multiframes +
 				          lane->lane_latency_octets;
 
 				if (abs(latency_ref - latency) > 8) {
-					gdk_color_parse("red", &color);
+					color = color_red;
 				} else if (abs(latency_ref - latency) > 4) {
-					gdk_color_parse("orange", &color);
+					color = color_orange;
 				} else {
-					gdk_color_parse("green", &color);
+					color = color_green;
 				}
 			}
 
@@ -1217,6 +1233,8 @@ GtkWidget *set_per_lane_status(struct jesd204b_laneinfo *info, unsigned lanes)
 	return grid;
 }
 
+
+
 void jesd_update_status(const char *path)
 {
 	struct jesd204b_jesd204_status info;
@@ -1241,22 +1259,23 @@ void jesd_update_status(const char *path)
 	sscanf((char *)&info.reported_link_clock, "%f", &reported);
 	sscanf((char *)&info.lane_rate_div, "%f", &div40);
 
-	if (measured > (reported * 1.0001) || measured < (reported * 0.9999)) {
-		gdk_color_parse("red", &color);
+	if (measured > (reported * (1 + PPM(CLOCK_ACCURACY))) ||
+		measured < (reported * (1 - PPM(CLOCK_ACCURACY)))) {
+		color = color_red;
 	} else {
-		gdk_color_parse("green", &color);
+		color = color_green;
 	}
 
 	gtk_widget_modify_fg(measured_link_clock, GTK_STATE_NORMAL, &color);
 
-	if (reported > (div40 * 1.0001) || reported < (div40 * 0.9999)) {
-		gdk_color_parse("red", &color);
+	if (reported > (div40 * (1 + PPM(CLOCK_ACCURACY))) ||
+		reported < (div40 * (1 - PPM(CLOCK_ACCURACY)))) {
+		color = color_red;
 	} else {
-		gdk_color_parse("green", &color);
+		color = color_green;
 	}
 
 	gtk_widget_modify_fg(lane_rate_div, GTK_STATE_NORMAL, &color);
-
 }
 
 int read_all_laneinfo(const char *path)
@@ -1269,11 +1288,6 @@ int read_all_laneinfo(const char *path)
 			ret = read_laneinfo(path, i, &lane_info[i]);
 
 			if (ret < 0) {
-				/* No such file or directory */
-				if (ret == -ENOENT) {
-					printf("no such lane %i\n", i);
-				}
-
 				/* No child processes */
 				if (ret == -ECHILD) {
 					printf("not root %i, when looking for lane %i\n", ret, i);
@@ -1292,31 +1306,7 @@ int read_all_laneinfo(const char *path)
 	return cnt;
 }
 
-static gboolean update_page(void)
-{
-	gint page = gtk_notebook_get_current_page(nbook);
-
-	if (page == 0) {
-		int cnt = 0;
-		char *path;
-
-		gchar *item = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(
-		                        jesd_core_selection));
-
-		if (item == NULL) {
-			return TRUE;
-		}
-
-		path = get_full_device_path(basedir, item);
-		jesd_update_status(path);
-		cnt = read_all_laneinfo(path);
-		grid = set_per_lane_status(lane_info, cnt);
-	}
-
-	return TRUE;
-}
-
-void jesd_core_selection_cb(GtkComboBoxText *combo_box, gpointer user_data)
+static int update_status(GtkComboBoxText *combo_box)
 {
 	int cnt = 0;
 	char *path;
@@ -1324,14 +1314,33 @@ void jesd_core_selection_cb(GtkComboBoxText *combo_box, gpointer user_data)
 	gchar *item = gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT(combo_box));
 
 	if (item == NULL) {
-		return;
+		return cnt;
 	}
 
+	g_mutex_lock(mutex);
 	path = get_full_device_path(basedir, item);
 	jesd_update_status(path);
 	cnt = read_all_laneinfo(path);
 	grid = set_per_lane_status(lane_info, cnt);
-	create_and_fill_model(cnt);
+	g_mutex_unlock(mutex);
+
+	return cnt;
+}
+
+static gboolean update_page(void)
+{
+	gint page = gtk_notebook_get_current_page(nbook);
+
+	if (page == 0) {
+		update_status(GTK_COMBO_BOX_TEXT(jesd_core_selection));
+	}
+
+	return TRUE;
+}
+
+void jesd_core_selection_cb(GtkComboBoxText *combo_box, gpointer user_data)
+{
+	create_and_fill_model(update_status(combo_box));
 }
 
 int main(int argc, char *argv[])
@@ -1381,6 +1390,7 @@ int main(int argc, char *argv[])
 
 
 	setlocale(LC_NUMERIC, "C");
+	mutex = g_mutex_new();
 
 	/* init threads */
 	gdk_threads_init();
@@ -1407,6 +1417,9 @@ int main(int argc, char *argv[])
 	lane[6] = GTK_WIDGET(gtk_builder_get_object(builder, "checkbutton7"));
 	lane[7] = GTK_WIDGET(gtk_builder_get_object(builder, "checkbutton8"));
 
+	gdk_color_parse("red", &color_red);
+	gdk_color_parse("green", &color_green);
+	gdk_color_parse("orange", &color_orange);
 
 	link_state = GTK_WIDGET(gtk_builder_get_object(builder, "link_state"));
 	measured_link_clock = GTK_WIDGET(gtk_builder_get_object(builder,
@@ -1448,6 +1461,10 @@ int main(int argc, char *argv[])
 	gtk_container_add(GTK_CONTAINER(box2), sock);
 	gtk_widget_set_size_request(GTK_WIDGET(sock), 480, 360);
 
+	box3 = GTK_WIDGET(gtk_builder_get_object(builder, "jesd_info"));
+	view = create_view_and_model(cnt);
+	gtk_container_add(GTK_CONTAINER(box3), view);
+
 	finished_eyes =
 	        GTK_WIDGET(gtk_builder_get_object(builder, "comboboxtext1"));
 	gtk_combo_box_text_remove(GTK_COMBO_BOX_TEXT(finished_eyes), 0);
@@ -1475,10 +1492,6 @@ int main(int argc, char *argv[])
 
 	get_devices(basedir, XCVR_DEVICE_NAME, device_select);
 	get_devices(basedir, JESD204_DEVICE_NAME, jesd_core_selection);
-
-	box3 = GTK_WIDGET(gtk_builder_get_object(builder, "jesd_info"));
-	view = create_view_and_model(cnt);
-	gtk_container_add(GTK_CONTAINER(box3), view);
 
 	logo = GTK_IMAGE(gtk_builder_get_object(builder, "logo"));
 
