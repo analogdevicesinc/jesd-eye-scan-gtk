@@ -1,6 +1,6 @@
 #!/bin/sh
 
-if [ -d /sys/bus/platform/devices/*axi-jesd204b-rx* ]
+if ls /sys/bus/platform/devices/*axi-jesd204* 1> /dev/null 2>&1;
 then
-  sudo /usr/local/bin/jesd_eye_scan&
+	sudo /usr/local/bin/jesd_eye_scan&
 fi
