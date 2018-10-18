@@ -110,6 +110,7 @@ GtkWidget *measured_link_clock;
 GtkWidget *reported_link_clock;
 GtkWidget *lane_rate;
 GtkWidget *lane_rate_div;
+GtkWidget *lmfc_rate;
 GtkWidget *sync_state;
 GtkWidget *link_status;
 GtkWidget *sysref_captured;
@@ -183,6 +184,7 @@ struct jesd204b_jesd204_status {
 	char reported_link_clock[MAX_SYSFS_STRING_SIZE];
 	char lane_rate[MAX_SYSFS_STRING_SIZE];
 	char lane_rate_div[MAX_SYSFS_STRING_SIZE];
+	char lmfc_rate[MAX_SYSFS_STRING_SIZE];
 	char sync_state[MAX_SYSFS_STRING_SIZE];
 	char link_status[MAX_SYSFS_STRING_SIZE];
 	char sysref_captured[MAX_SYSFS_STRING_SIZE];
@@ -850,6 +852,7 @@ int read_jesd204_status(const char *basedir,
 	}
 
 	ret = fscanf(pFile, "Lane rate / 40: %s MHz\n", (char *)&info->lane_rate_div);
+	ret = fscanf(pFile, "LMFC rate: %s MHz\n", (char *)&info->lmfc_rate);
 
 	/* Only on TX */
 	pos = ftell(pFile);
@@ -1249,6 +1252,7 @@ void jesd_update_status(const char *path)
 	set_lable_text(reported_link_clock, (char *)&info.reported_link_clock, NULL, 0);
 	set_lable_text(lane_rate, (char *)&info.lane_rate, NULL, 0);
 	set_lable_text(lane_rate_div,(char *) &info.lane_rate_div, NULL, 0);
+	set_lable_text(lmfc_rate,(char *) &info.lmfc_rate, NULL, 0);
 
 	set_lable_text(sync_state, (char *)&info.sync_state, "deasserted", 0);
 	set_lable_text(sysref_captured, (char *)&info.sysref_captured, "No", 1);
@@ -1428,6 +1432,7 @@ int main(int argc, char *argv[])
 	                                 "reported_link_clock"));
 	lane_rate = GTK_WIDGET(gtk_builder_get_object(builder, "lane_rate"));
 	lane_rate_div = GTK_WIDGET(gtk_builder_get_object(builder, "lane_rate_div"));
+	lmfc_rate = GTK_WIDGET(gtk_builder_get_object(builder, "lmfc_rate"));
 	sync_state = GTK_WIDGET(gtk_builder_get_object(builder, "sync_state"));
 	link_status = GTK_WIDGET(gtk_builder_get_object(builder, "link_status"));
 	sysref_captured = GTK_WIDGET(gtk_builder_get_object(builder,
