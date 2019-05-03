@@ -125,6 +125,7 @@ enum {
 
 struct jesd204b_laneinfo lane_info[MAX_LANES];
 struct jesd204b_xcvr_eyescan_info eyescan_info;
+char jesd_devices[MAX_DEVICES][PATH_MAX];
 
 unsigned long long get_lane_rate(unsigned lane)
 {
@@ -264,40 +265,13 @@ static GtkWidget *create_view_and_model(unsigned active_lanes)
 
 int get_devices(const char *path, const char *device, GtkWidget *device_select)
 {
+	int dev_num, i;
 
-	FILE *fp;
-	char cmd[512], device_name[128];
-	int ret;
+	dev_num = jesd_find_devices(path, device, jesd_devices);
 
-	/* flushes all open output streams */
-	fflush(NULL);
-
-	ret = snprintf(cmd, sizeof(cmd),
-	               "find %s -name *%s* -printf '%%f\n' 2>/dev/null",
-	               path, device);
-
-	if (ret < 0) {
-		return -ENODEV;
-	}
-
-	fp = popen(cmd, "r");
-
-	if (fp == NULL) {
-		fprintf(stderr, "can't execute find\n");
-		return -errno;
-	}
-
-	while (fgets(device_name, sizeof(device_name), fp) != NULL) {
-		/* strip trailing new lines */
-		if (device_name[strlen(device_name) - 1] == '\n') {
-			device_name[strlen(device_name) - 1] = '\0';
-		}
-
+	for (i = 0; i < dev_num; i++)
 		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(device_select),
-		                               (const gchar *)device_name);
-	}
-
-	pclose(fp);
+					       (const gchar *)jesd_devices[i]);
 
 	gtk_combo_box_set_active(GTK_COMBO_BOX(device_select), 0);
 
