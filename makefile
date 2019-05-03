@@ -4,7 +4,7 @@ CFLAGS+= `pkg-config --cflags gtk+-3.0` -Wl,--export-dynamic
 LIBS= `pkg-config --libs gtk+-3.0`
 
 ALL:
-	$(CC)  $(CFLAGS) jesd_eye_scan.c $(LIBS) -o jesd_eye_scan -lm
+	$(CC)  $(CFLAGS) jesd_eye_scan.c jesd_common.c $(LIBS) -o jesd_eye_scan -lm
 
 install:
 	install -d $(DESTDIR)/bin
