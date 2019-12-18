@@ -1098,7 +1098,7 @@ int main(int argc, char *argv[])
 	GtkWidget *view;
 	GtkImage *logo;
 	struct stat buf;
-	int ret, c, cnt = 0;
+	int ret, c, i, cnt = 0;
 	char *path = NULL;
 	opterr = 0;
 
@@ -1156,14 +1156,12 @@ int main(int argc, char *argv[])
 
 	nbook = GTK_NOTEBOOK(gtk_builder_get_object(builder, "notebook1"));
 
-	lane[0] = GTK_WIDGET(gtk_builder_get_object(builder, "checkbutton1"));
-	lane[1] = GTK_WIDGET(gtk_builder_get_object(builder, "checkbutton2"));
-	lane[2] = GTK_WIDGET(gtk_builder_get_object(builder, "checkbutton3"));
-	lane[3] = GTK_WIDGET(gtk_builder_get_object(builder, "checkbutton4"));
-	lane[4] = GTK_WIDGET(gtk_builder_get_object(builder, "checkbutton5"));
-	lane[5] = GTK_WIDGET(gtk_builder_get_object(builder, "checkbutton6"));
-	lane[6] = GTK_WIDGET(gtk_builder_get_object(builder, "checkbutton7"));
-	lane[7] = GTK_WIDGET(gtk_builder_get_object(builder, "checkbutton8"));
+
+	for (i = 0; i < MAX_LANES; i++) {
+		char text[32];
+		g_snprintf(text, sizeof(text), "checkbutton%d", i + 1);
+		lane[i] = GTK_WIDGET(gtk_builder_get_object(builder, text));
+	}
 
 	gdk_color_parse("red", &color_red);
 	gdk_color_parse("green", &color_green);
