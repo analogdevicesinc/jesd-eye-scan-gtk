@@ -61,6 +61,7 @@ enum color_pairs {
 	C_GOOD = 2,
 	C_ERR = 3,
 	C_CRIT = 4,
+	C_OPT = 5,
 };
 
 struct jesd204b_laneinfo lane_info[MAX_LANES];
@@ -128,6 +129,18 @@ void jesd_clear_win(WINDOW *win, int simple)
 	if (!simple)
 		box(win, 0, 0);
 }
+
+#define jesd_print_win_args(win, y, x, c, fmt, args...) \
+({ \
+	int __x; \
+	\
+	wcolor_set(win, c, NULL); \
+	mvwprintw(win, y, x, fmt, ##args); \
+	wcolor_set(win, C_NORM, NULL); \
+	__x = jesd_get_strlen(win, x); \
+	__x; \
+})
+
 
 int jesd_print_win(WINDOW *win, int y, int x, enum color_pairs c,
 		   const char *str)
@@ -281,11 +294,35 @@ int jesd_setup_subwin(WINDOW *win, const char *name, const char **lables)
 	return pos + COL_SPACEING;
 }
 
+static void jesd_set_current_device(const int dev_idx)
+{
+	wcolor_set(dev_win, C_GOOD, NULL);
+	mvwprintw(dev_win, 2 + dev_idx, strlen(jesd_devices[dev_idx]) + 8, "[*]");
+	wcolor_set(dev_win, C_NORM, NULL);
+	wrefresh(dev_win);
+}
+
+static void jesd_move_device(const int old_idx, const int new_idx,
+			     const int simple)
+{
+	if (old_idx == new_idx)
+		return;
+	/* clear the old selected dev */
+	wmove(dev_win, 2 + old_idx, strlen(jesd_devices[old_idx]) + 6);
+	wclrtoeol(dev_win);
+	jesd_set_current_device(new_idx);
+	/* Clear the lane window since the next device might not have lane info */
+	jesd_clear_win(lane_win, true);
+	wrefresh(lane_win);
+}
+
 int main(int argc, char *argv[])
 {
-	int c, cnt = 0, x, i, simple = 0;
+	int c, cnt = 0, x = 1, i, simple = 0;
 	int termx, termy, dev_num = 0;
 	char *path = NULL;
+	int dev_idx = 0;
+
 	opterr = 0;
 
 	while ((c = getopt(argc, argv, "sp:")) != -1)
@@ -330,6 +367,7 @@ int main(int argc, char *argv[])
 		init_pair(C_GOOD, COLOR_GREEN, COLOR_BLACK);
 		init_pair(C_ERR, COLOR_RED, COLOR_BLACK);
 		init_pair(C_CRIT, COLOR_YELLOW, COLOR_BLACK);
+		init_pair(C_OPT, COLOR_WHITE, COLOR_CYAN);
 		bkgd(COLOR_PAIR(1));
 	}
 
@@ -350,40 +388,65 @@ int main(int argc, char *argv[])
 
 	mvwprintw(dev_win, 0, 1, "(DEVICES) Found %d JESD204 Link Layer peripherals",
 		  dev_num);
-	for (i = 0; i < dev_num; i++)
-		mvwprintw(dev_win, 2 + i, 1, "(%d): %s", i, jesd_devices[i]);
 
+	for (i = 0; i < dev_num; i++) {
+		mvwprintw(dev_win, 2 + i, 1, "(%d): %s", i, jesd_devices[i]);
+		x += jesd_print_win_args(main_win, termy - 2, x, C_NORM, "F%d", i + 1);
+		x += jesd_print_win_args(main_win, termy - 2, x, C_OPT, "%s", jesd_devices[i]);
+	}
+	/* add quit option */
+	x += jesd_print_win_args(main_win, termy - 2, x, C_NORM, "F%d",
+				 MAX_DEVICES + 1);
+	jesd_print_win(main_win, termy - 2, x, C_OPT, "Quit");
+
+	jesd_print_win(main_win, termy - 3, 1, C_OPT,
+		       "You can also use 'q' to quit and 'a' or 'd' to move between devices!");
 
 	wrefresh(main_win);
 	wrefresh(dev_win);
 
+	/* defaut to first device */
+	jesd_set_current_device(0);
+
 	while (true) {
+
 		jesd_clear_win(stat_win, simple);
 		x = jesd_setup_subwin(stat_win, "(STATUS)", link_status_lables);
+		jesd_update_status(stat_win, x, jesd_devices[dev_idx]);
 
-		for (i = 0; i < dev_num; i++) {
-			mvwprintw(stat_win, 0, x - 1, "(%d)", i);
-			x += jesd_update_status(stat_win, x, jesd_devices[i]);
-		}
+		cnt = read_all_laneinfo(get_full_device_path(basedir, jesd_devices[dev_idx]),
+					lane_info);
+		if (cnt) {
+			jesd_clear_win(lane_win, simple);
+			x = jesd_setup_subwin(lane_win, "(LANE STATUS)", lane_status_lables);
 
-		jesd_clear_win(lane_win, simple);
-		x = jesd_setup_subwin(lane_win, "(LANE STATUS)", lane_status_lables);
-
-		for (i = 0; i < dev_num; i++) {
-			cnt = read_all_laneinfo(get_full_device_path(basedir, jesd_devices[i]), lane_info);
-			if (cnt) {
-				mvwprintw(lane_win, 0, x - 1, "(%d)", i);
-				x = update_lane_status(lane_win, x + 1, lane_info, cnt);
-			}
+			update_lane_status(lane_win, x + 1, lane_info, cnt);
+			wrefresh(lane_win);
 		}
 
 		wrefresh(stat_win);
-		wrefresh(lane_win);
 
-		c = 0;
 		c = getch();
+		if (c >= KEY_F(1) && c <= KEY_F0 + dev_num) {
+			int old_idx = dev_idx;
+			dev_idx = c - KEY_F0 - 1;
+			jesd_move_device(old_idx, dev_idx, simple);
+		} else if (c == 'd') {
+			int old_idx = dev_idx;
 
-		if (c > 0)
+			if (dev_idx + 1 >= dev_num)
+				dev_idx = 0;
+			else
+				dev_idx++;
+			jesd_move_device(old_idx, dev_idx, simple);
+		} else if (c == 'a') {
+			int old_idx = dev_idx;
+			if (!dev_idx)
+				dev_idx = dev_num - 1;
+			else
+				dev_idx--;
+			jesd_move_device(old_idx, dev_idx, simple);
+		} else if (c == KEY_F0 + MAX_DEVICES + 1 || c == 'q')
 			break;
 
 		sleep(1);
