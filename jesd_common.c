@@ -80,12 +80,48 @@ int jesd_find_devices(const char *basedir, const char *name,
 	return num;
 }
 
+int read_encoding(const char *basedir)
+{
+	char temp[PATH_MAX];
+	char encoder[MAX_SYSFS_STRING_SIZE];
+	FILE *f;
+	int ret;
+
+	memset(encoder, 0, sizeof(encoder));
+
+	sprintf(temp, "%s/encoder", basedir);
+	f = fopen(temp, "r");
+	/*
+	 * If the file is not there, default to 8b10b. It might be an older
+	 * kernel and, most likely, only supports jesd204b
+	 */
+	if (!f && errno == ENOENT)
+	        return JESD204_ENCODER_8B10B;
+	else if (!f)
+		return -errno;
+
+	fread(encoder, sizeof(encoder), 1, f);
+
+	if (!strcmp(encoder, "8b10b"))
+	        ret = JESD204_ENCODER_8B10B;
+	else
+	        ret = JESD204_ENCODER_64B66B;
+
+	fclose(f);
+
+	return ret;
+}
+
 int read_laneinfo(const char *basedir, unsigned lane,
 		  struct jesd204b_laneinfo *info)
 {
 	FILE *pFile;
 	char temp[PATH_MAX];
 	int ret = 0;
+	int encoder = read_encoding(basedir);
+
+	if (encoder < 0)
+		return encoder;
 
 	memset(info, 0, sizeof(*info));
 
@@ -97,6 +133,11 @@ int read_laneinfo(const char *basedir, unsigned lane,
 		return -errno;
 
 	ret = fscanf(pFile, "Errors: %u\n", &info->lane_errors);
+	if (encoder == JESD204_ENCODER_64B66B) {
+		ret += fscanf(pFile, "State of Extended multiblock alignment:%s\n",
+			      (char *)&info->ext_multiblock_align_state);
+		goto close_f;
+	};
 	ret += fscanf(pFile, "CGS state: %s\n", (char *)&info->cgs_state);
 	ret += fscanf(pFile, "Initial Frame Synchronization: %s\n",
 		      (char *)&info->init_frame_sync);
@@ -138,7 +179,7 @@ int read_laneinfo(const char *basedir, unsigned lane,
 		      &info->jesdv, &info->subclassv);
 
 	ret += fscanf(pFile, "FC: %lu\n", &info->fc);
-
+close_f:
 	fclose(pFile);
 
 	return ret;
@@ -180,6 +221,10 @@ int read_jesd204_status(const char *basedir,
 	char temp[PATH_MAX];
 	long pos;
 	int ret = 0;
+	int encoder = read_encoding(basedir);
+
+	if (encoder < 0)
+		return encoder;
 
 	sprintf(temp, "%s/status", basedir);
 
@@ -210,16 +255,20 @@ int read_jesd204_status(const char *basedir,
 		return ret;
 	}
 
-	ret = fscanf(pFile, "Lane rate / 40: %s MHz\n", (char *)&info->lane_rate_div);
-	ret = fscanf(pFile, "LMFC rate: %s MHz\n", (char *)&info->lmfc_rate);
+	if (encoder == JESD204_ENCODER_8B10B) {
+		ret = fscanf(pFile, "Lane rate / 40: %s MHz\n", (char *)&info->lane_rate_div);
+		ret = fscanf(pFile, "LMFC rate: %s MHz\n", (char *)&info->lmfc_rate);
 
-	/* Only on TX */
-	pos = ftell(pFile);
-	ret = fscanf(pFile, "SYNC~: %s\n", (char *)&info->sync_state);
+		/* Only on TX */
+		pos = ftell(pFile);
+		ret = fscanf(pFile, "SYNC~: %s\n", (char *)&info->sync_state);
 
-	if (ret != 1)
-		fseek(pFile, pos, SEEK_SET);
-
+		if (ret != 1)
+			fseek(pFile, pos, SEEK_SET);
+	} else {
+		ret = fscanf(pFile, "Lane rate / 66: %s MHz\n", (char *)&info->lane_rate_div);
+		ret = fscanf(pFile, "LEMC rate: %s MHz\n", (char *)&info->lmfc_rate);
+	}
 	ret = fscanf(pFile, "Link status: %s\n", (char *)&info->link_status);
 	ret = fscanf(pFile, "SYSREF captured: %s\n", (char *)&info->sysref_captured);
 	ret = fscanf(pFile, "SYSREF alignment error: %s\n",
