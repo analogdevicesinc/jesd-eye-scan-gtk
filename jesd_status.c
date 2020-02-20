@@ -460,6 +460,7 @@ int main(int argc, char *argv[])
 		}
 
 		wrefresh(stat_win);
+		usleep(1000 * 100);
 
 		c = getch();
 		if (c >= KEY_F(1) && c <= KEY_F0 + dev_num) {
@@ -484,7 +485,6 @@ int main(int argc, char *argv[])
 		} else if (c == KEY_F0 + MAX_DEVICES + 1 || c == 'q')
 			break;
 
-		sleep(1);
 	}
 
 	terminal_stop();
