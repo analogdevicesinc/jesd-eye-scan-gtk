@@ -54,6 +54,8 @@
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
+#define        JESD204_ENCODER_8B10B   0
+#define        JESD204_ENCODER_64B66B  1
 
 struct jesd204b_laneinfo {
 	unsigned did;		/* DID Device ID */
@@ -86,6 +88,7 @@ struct jesd204b_laneinfo {
 	char cgs_state[MAX_SYSFS_STRING_SIZE];
 	char init_frame_sync[MAX_SYSFS_STRING_SIZE];
 	char init_lane_align_seq[MAX_SYSFS_STRING_SIZE];
+	char ext_multiblock_align_state[MAX_SYSFS_STRING_SIZE];
 };
 
 struct jesd204b_xcvr_eyescan_info {
@@ -123,5 +126,6 @@ int read_all_laneinfo(const char *path,
 		      struct jesd204b_laneinfo lane_info[MAX_LANES]);
 int read_jesd204_status(const char *basedir,
 			struct jesd204b_jesd204_status *info);
+int read_encoding(const char *basedir);
 
 #endif
