@@ -93,6 +93,12 @@ static const char *lane_status_lables[] = {
 	NULL
 };
 
+static void jesd_clear_line_from(WINDOW *win, int y, int x)
+{
+	wmove(win, y, x);
+	wclrtoeol(win);
+}
+
 void terminal_start()
 {
 	initscr();
@@ -143,8 +149,11 @@ void jesd_clear_win(WINDOW *win, int simple)
 
 
 int jesd_print_win(WINDOW *win, int y, int x, enum color_pairs c,
-		   const char *str)
+		   const char *str, const bool clear)
 {
+	if (clear)
+		jesd_clear_line_from(win, y, x);
+
 	wcolor_set(win, c, NULL);
 	mvwprintw(win, y, x, str);
 	wcolor_set(win, C_NORM, NULL);
@@ -153,7 +162,7 @@ int jesd_print_win(WINDOW *win, int y, int x, enum color_pairs c,
 }
 
 int jesd_print_win_exp(WINDOW *win, int y, int x, const char *text,
-		       const char *expected, unsigned invert)
+		       const char *expected, unsigned invert, const bool clear)
 {
 	enum color_pairs c;
 
@@ -162,7 +171,7 @@ int jesd_print_win_exp(WINDOW *win, int y, int x, const char *text,
 	else
 		c = (invert ? C_ERR : C_GOOD);
 
-	return jesd_print_win(win, y, x, c, text);
+	return jesd_print_win(win, y, x, c, text, clear);
 }
 
 
@@ -210,6 +219,7 @@ int update_lane_status(WINDOW *win, int x, struct jesd204b_laneinfo *info,
 		else
 			wcolor_set(win, C_GOOD, NULL);
 
+		jesd_clear_line_from(win, y, x);
 		mvwprintw(win, y++, x, "%d", lane->lane_errors);
 		pos = jesd_maxx(pos, jesd_get_strlen(win, x));
 
@@ -219,11 +229,11 @@ int update_lane_status(WINDOW *win, int x, struct jesd204b_laneinfo *info,
 		pos = jesd_maxx(pos, jesd_get_strlen(win, x));
 
 		pos = jesd_maxx(pos, jesd_print_win_exp(win, y++, x, lane->cgs_state, "DATA",
-							0));
+							0, true));
 		pos = jesd_maxx(pos, jesd_print_win_exp(win, y++, x, lane->init_frame_sync,
-							"Yes", 0));
+							"Yes", 0, true));
 		pos = jesd_maxx(pos, jesd_print_win_exp(win, y++, x, lane->init_lane_align_seq,
-							"Yes", 0));
+							"Yes", 0, true));
 
 		x += pos + COL_SPACEING;
 	}
@@ -257,25 +267,25 @@ int jesd_update_status(WINDOW *win, int x, const char *device)
 		c_lane_rate_div = C_GOOD;
 
 	pos = jesd_maxx(pos, jesd_print_win_exp(win, y++, x, (char *)&info.link_state,
-						"enabled", 0));
+						"enabled", 0, true));
 	pos = jesd_maxx(pos, jesd_print_win_exp(win, y++, x, (char *)&info.link_status,
-						"DATA", 0));
+						"DATA", 0, true));
 	pos = jesd_maxx(pos, jesd_print_win(win, y++, x, c_measured_link_clock,
-					    (char *)&info.measured_link_clock));
+					    (char *)&info.measured_link_clock, true));
 	pos = jesd_maxx(pos, jesd_print_win(win, y++, x, C_NORM,
-					    (char *)&info.reported_link_clock));
+					    (char *)&info.reported_link_clock, true));
 	pos = jesd_maxx(pos, jesd_print_win(win, y++, x, C_NORM,
-					    (char *)&info.lane_rate));
+					    (char *)&info.lane_rate, true));
 	pos = jesd_maxx(pos, jesd_print_win(win, y++, x, c_lane_rate_div,
-					    (char *)&info.lane_rate_div));
+					    (char *)&info.lane_rate_div, true));
 	pos = jesd_maxx(pos, jesd_print_win(win, y++, x, C_NORM,
-					    (char *)&info.lmfc_rate));
+					    (char *)&info.lmfc_rate, true));
 	pos = jesd_maxx(pos, jesd_print_win_exp(win, y++, x,
-						(char *)&info.sysref_captured, "No", 1));
+						(char *)&info.sysref_captured, "No", 1, true));
 	pos = jesd_maxx(pos, jesd_print_win_exp(win, y++, x,
-						(char *)&info.sysref_alignment_error, "Yes", 1));
+						(char *)&info.sysref_alignment_error, "Yes", 1, true));
 	pos = jesd_maxx(pos, jesd_print_win_exp(win, y++, x, (char *)&info.sync_state,
-						"deasserted", 0));
+						"deasserted", 0, true));
 
 	return pos + COL_SPACEING;
 }
@@ -287,7 +297,7 @@ int jesd_setup_subwin(WINDOW *win, const char *name, const char **lables)
 	mvwprintw(win, 0, 1, name);
 
 	while (lables[i]) {
-		pos = jesd_maxx(pos, jesd_print_win(win, i + 1, 1, C_NORM, lables[i]));
+		pos = jesd_maxx(pos, jesd_print_win(win, i + 1, 1, C_NORM, lables[i], false));
 		i++;
 	}
 
@@ -302,18 +312,37 @@ static void jesd_set_current_device(const int dev_idx)
 	wrefresh(dev_win);
 }
 
+/*
+ * This is a workaround to redraw the right line in the windows boxes/borders.
+ * This happens because `jesd_clear_line_from()` will clear the current line
+ * till the EOL which removes part of the box vertical line.
+ */
+static void jesd_redo_r_box(WINDOW *win, const int simple)
+{
+	int x, y;
+
+	if(simple)
+		return;
+
+	getmaxyx(win, y, x);
+	wmove(win, 1, x - 1);
+	/* redraw vertical line */
+	wvline(win, 0, y - 2);
+}
+
 static void jesd_move_device(const int old_idx, const int new_idx,
 			     const int simple)
 {
 	if (old_idx == new_idx)
 		return;
 	/* clear the old selected dev */
-	wmove(dev_win, 2 + old_idx, strlen(jesd_devices[old_idx]) + 6);
-	wclrtoeol(dev_win);
+	jesd_clear_line_from(dev_win, 2 + old_idx, strlen(jesd_devices[old_idx]) + 6);
+	jesd_redo_r_box(dev_win, simple);
 	jesd_set_current_device(new_idx);
 	/* Clear the lane window since the next device might not have lane info */
 	jesd_clear_win(lane_win, true);
 	wrefresh(lane_win);
+	jesd_clear_win(stat_win, simple);
 }
 
 int main(int argc, char *argv[])
@@ -384,6 +413,8 @@ int main(int argc, char *argv[])
 	if (!simple) {
 		box(dev_win, 0, 0);
 		box(main_win, 0, 0);
+		box(stat_win, 0, 0);
+		box(lane_win, 0, 0);
 	}
 
 	mvwprintw(dev_win, 0, 1, "(DEVICES) Found %d JESD204 Link Layer peripherals",
@@ -397,10 +428,11 @@ int main(int argc, char *argv[])
 	/* add quit option */
 	x += jesd_print_win_args(main_win, termy - 2, x, C_NORM, "F%d",
 				 MAX_DEVICES + 1);
-	jesd_print_win(main_win, termy - 2, x, C_OPT, "Quit");
+	jesd_print_win(main_win, termy - 2, x, C_OPT, "Quit", false);
 
 	jesd_print_win(main_win, termy - 3, 1, C_OPT,
-		       "You can also use 'q' to quit and 'a' or 'd' to move between devices!");
+		       "You can also use 'q' to quit and 'a' or 'd' to move between devices!",
+		       false);
 
 	wrefresh(main_win);
 	wrefresh(dev_win);
@@ -410,17 +442,20 @@ int main(int argc, char *argv[])
 
 	while (true) {
 
-		jesd_clear_win(stat_win, simple);
 		x = jesd_setup_subwin(stat_win, "(STATUS)", link_status_lables);
 		jesd_update_status(stat_win, x, jesd_devices[dev_idx]);
+		jesd_redo_r_box(stat_win, simple);
 
 		cnt = read_all_laneinfo(get_full_device_path(basedir, jesd_devices[dev_idx]),
 					lane_info);
 		if (cnt) {
-			jesd_clear_win(lane_win, simple);
+			if (!simple)
+				box(lane_win, 0, 0);
+
 			x = jesd_setup_subwin(lane_win, "(LANE STATUS)", lane_status_lables);
 
 			update_lane_status(lane_win, x + 1, lane_info, cnt);
+			jesd_redo_r_box(lane_win, simple);
 			wrefresh(lane_win);
 		}
 
