@@ -924,7 +924,8 @@ GtkWidget *set_per_lane_status(struct jesd204b_laneinfo *info, unsigned lanes)
 	GtkWidget *label;
 	char text[128];
 	int i, j;
-	int latency_ref, latency;
+	int latency_min, latency, octets_per_multifame;
+	struct jesd204b_laneinfo *tmp = info;
 
 	static const char *tab_lables[] = {
 		"Lane#",
@@ -944,6 +945,15 @@ GtkWidget *set_per_lane_status(struct jesd204b_laneinfo *info, unsigned lanes)
 		return NULL;
 	}
 
+	for (i = 0, latency_min = INT_MAX; i < lanes; i++) {
+		lane = tmp++;
+		octets_per_multifame = lane->k * lane->f;
+
+		latency_min = MIN(latency_min, octets_per_multifame *
+			lane->lane_latency_multiframes +
+			lane->lane_latency_octets);
+	}
+
 	grid = gtk_grid_new();
 	gtk_grid_set_column_spacing(GTK_GRID(grid), 20);
 	gtk_grid_set_row_spacing(GTK_GRID(grid), 10);
@@ -959,18 +969,15 @@ GtkWidget *set_per_lane_status(struct jesd204b_laneinfo *info, unsigned lanes)
 			}
 		} else {
 			lane = info++;
+			octets_per_multifame = lane->k * lane->f;
 
-			if (i == 1) {
-				latency_ref = lane->k * lane->lane_latency_multiframes +
-				              lane->lane_latency_octets;
-				color = color_green;
+			latency = octets_per_multifame * lane->lane_latency_multiframes +
+				  lane->lane_latency_octets;
+
+			if ((latency - latency_min) >= octets_per_multifame) {
+				color = color_red;
 			} else {
-				latency = lane->k * lane->lane_latency_multiframes +
-				          lane->lane_latency_octets;
-
-				if (abs(latency_ref - latency) > 8) {
-					color = color_red;
-				} else if (abs(latency_ref - latency) > 4) {
+				if ((latency - latency_min) > (octets_per_multifame / 2)) {
 					color = color_orange;
 				} else {
 					color = color_green;

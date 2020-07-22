@@ -46,10 +46,9 @@
 #include <string.h>
 #include <errno.h>
 #include <sys/stat.h>
+#include <limits.h>
 
 #include "jesd_common.h"
-
-#define MAX(a,b) (((a)>(b))?(a):(b))
 
 #define JESD204_DEVICE_NAME 	"jesd204"
 #define XCVR_DEVICE_NAME 	"adxcvr"
@@ -196,39 +195,41 @@ int jesd_print_win_exp(WINDOW *win, int y, int x, const char *text,
 	return jesd_print_win(win, y, x, c, text, clear);
 }
 
-
-
-
 int update_lane_status(WINDOW *win, int x, struct jesd204b_laneinfo *info,
 		       unsigned lanes)
 {
 	struct jesd204b_laneinfo *lane;
 	enum color_pairs c;
-	int latency_ref, latency, i, y, pos = 0;
+	int octets_per_multifame, latency_min, latency, i, y, pos = 0;
+	struct jesd204b_laneinfo *tmp = info;
 
 	if (!lanes)
 		return 0;
+
+	for (i = 0, latency_min = INT_MAX; i < lanes; i++) {
+		lane = tmp++;
+		octets_per_multifame = lane->k * lane->f;
+
+		latency_min = MIN(latency_min, octets_per_multifame *
+				  lane->lane_latency_multiframes +
+				  lane->lane_latency_octets);
+	}
 
 	for (i = 0; i < lanes; i++) {
 		y = 1;
 
 		lane = info++;
+		octets_per_multifame = lane->k * lane->f;
 
-		if (i == 0) {
-			latency_ref = lane->k * lane->lane_latency_multiframes +
-				      lane->lane_latency_octets;
+		latency = octets_per_multifame * lane->lane_latency_multiframes +
+			  lane->lane_latency_octets;
+
+		if ((latency - latency_min) >= octets_per_multifame)
+			c = C_ERR;
+		else if ((latency - latency_min) > (octets_per_multifame / 2))
+			c = C_CRIT;
+		else
 			c = C_GOOD;
-		} else {
-			latency = lane->k * lane->lane_latency_multiframes +
-				  lane->lane_latency_octets;
-
-			if (abs(latency_ref - latency) > 8)
-				c = C_ERR;
-			else if (abs(latency_ref - latency) > 4)
-				c = C_CRIT;
-			else
-				c = C_GOOD;
-		}
 
 		wcolor_set(win, C_NORM, NULL);
 

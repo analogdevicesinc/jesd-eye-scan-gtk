@@ -53,6 +53,8 @@
 #define CLOCK_ACCURACY		200
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+#define MAX(a,b) (((a)>(b))?(a):(b))
+#define MIN(a,b) (((a)<(b))?(a):(b))
 
 #define        JESD204_ENCODER_8B10B   0
 #define        JESD204_ENCODER_64B66B  1
