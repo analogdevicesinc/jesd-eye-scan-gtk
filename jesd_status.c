@@ -500,7 +500,7 @@ int main(int argc, char *argv[])
 		}
 
 		wrefresh(stat_win);
-		usleep(1000 * 100);
+		usleep(1000 * 250); /* 250 ms */
 
 		c = getch();
 		if (c >= KEY_F(1) && c <= KEY_F0 + dev_num) {
