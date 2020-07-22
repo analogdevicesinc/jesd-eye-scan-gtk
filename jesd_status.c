@@ -233,6 +233,7 @@ int update_lane_status(WINDOW *win, int x, struct jesd204b_laneinfo *info,
 
 		wcolor_set(win, C_NORM, NULL);
 
+		jesd_clear_line_from(win, y, x);
 		mvwprintw(win, y++, x, "%d", i);
 		pos = jesd_maxx(pos, jesd_get_strlen(win, x));
 
@@ -255,6 +256,7 @@ int update_lane_status(WINDOW *win, int x, struct jesd204b_laneinfo *info,
 		}
 
 		wcolor_set(win, c, NULL);
+		jesd_clear_line_from(win, y, x);
 		mvwprintw(win, y++, x, "%d/%d", lane->lane_latency_multiframes,
 			  lane->lane_latency_octets);
 		pos = jesd_maxx(pos, jesd_get_strlen(win, x));
