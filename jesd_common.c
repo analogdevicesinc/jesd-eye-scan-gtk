@@ -56,22 +56,24 @@ char *get_full_device_path(const char *basedir, const char *device)
 	return path;
 }
 
-int jesd_find_devices(const char *basedir, const char *name,
-		      char devices[MAX_DEVICES][PATH_MAX])
+int jesd_find_devices(const char *basedir, const char *driver,
+		      char devices[MAX_DEVICES][PATH_MAX], int start)
 {
 	struct dirent *de;
-	DIR *dr = opendir(basedir);
-	int num = 0;
+	char path[PATH_MAX];
+	DIR *dr;
+	int num = start;
 
+	snprintf(path, sizeof(path), "%s/%s", basedir, driver);
+	dr = opendir(path);
 	if (dr == NULL) {
 		fprintf(stderr, "Could not open current directory\n");
 		return 0;
 	}
 
 	while ((de = readdir(dr)) != NULL)
-		if (strstr(de->d_name, name) && num < MAX_DEVICES) {
-			strncpy((char *)&devices[num], de->d_name,
-				sizeof(devices[num]));
+		if (de->d_type == DT_LNK && num < MAX_DEVICES) {
+			snprintf((char *)&devices[num], PATH_MAX, "%s/%s", driver, de->d_name);
 			num++;
 		}
 

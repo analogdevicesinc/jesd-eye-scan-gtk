@@ -50,9 +50,6 @@
 
 #include "jesd_common.h"
 
-#define JESD204_DEVICE_NAME 	"jesd204"
-#define XCVR_DEVICE_NAME 	"adxcvr"
-
 #define COL_SPACEING 3
 
 enum color_pairs {
@@ -419,9 +416,10 @@ int main(int argc, char *argv[])
 	if (!path)
 		path = "";
 
-	snprintf(basedir, sizeof(basedir), "%s/sys/bus/platform/devices", path);
+	snprintf(basedir, sizeof(basedir), "%s/sys/bus/platform/drivers", path);
 
-	dev_num = jesd_find_devices(basedir, JESD204_DEVICE_NAME, jesd_devices);
+	dev_num = jesd_find_devices(basedir, JESD204_RX_DRIVER_NAME, jesd_devices, 0);
+	dev_num = jesd_find_devices(basedir, JESD204_TX_DRIVER_NAME, jesd_devices, dev_num);
 	if (!dev_num) {
 		fprintf(stderr, "Failed to find JESD devices\n");
 		return 0;

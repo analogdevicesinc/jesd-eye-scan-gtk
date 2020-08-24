@@ -59,6 +59,10 @@
 #define        JESD204_ENCODER_8B10B   0
 #define        JESD204_ENCODER_64B66B  1
 
+#define JESD204_RX_DRIVER_NAME	"axi-jesd204-rx"
+#define JESD204_TX_DRIVER_NAME	"axi-jesd204-tx"
+#define XCVR_DRIVER_NAME	"axi_adxcvr_drv"
+
 struct jesd204b_laneinfo {
 	unsigned did;		/* DID Device ID */
 	unsigned bid;		/* BID Bank ID */
@@ -120,8 +124,8 @@ struct jesd204b_jesd204_status {
 };
 
 char *get_full_device_path(const char *basedir, const char *device);
-int jesd_find_devices(const char *basedir, const char *name,
-		      char devices[MAX_DEVICES][PATH_MAX]);
+int jesd_find_devices(const char *basedir, const char *drvname,
+		      char devices[MAX_DEVICES][PATH_MAX], int start);
 int read_laneinfo(const char *basedir, unsigned lane,
 		  struct jesd204b_laneinfo *info);
 int read_all_laneinfo(const char *path,
