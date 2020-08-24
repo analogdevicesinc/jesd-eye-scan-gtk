@@ -382,19 +382,24 @@ static void jesd_move_device(const int old_idx, const int new_idx,
 int main(int argc, char *argv[])
 {
 	int c, cnt = 0, x = 1, i, simple = 0;
+	int up_key = 'a', down_key = 'd';
 	int termx, termy, dev_num = 0;
 	char *path = NULL;
 	int dev_idx = 0;
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "sp:")) != -1)
+	while ((c = getopt(argc, argv, "svp:")) != -1)
 		switch (c) {
 		case 'p':
 			path = optarg;
 			break;
 		case 's': /* Simple mode */
 			simple = 1;
+			break;
+		case 'v':
+			up_key = 'k';
+			down_key = 'j';
 			break;
 		case '?':
 			if (optopt == 'd' || optopt == 'p')
@@ -509,7 +514,7 @@ int main(int argc, char *argv[])
 			int old_idx = dev_idx;
 			dev_idx = c - KEY_F0 - 1;
 			jesd_move_device(old_idx, dev_idx, simple);
-		} else if (c == 'd') {
+		} else if (c == down_key) {
 			int old_idx = dev_idx;
 
 			if (dev_idx + 1 >= dev_num)
@@ -517,7 +522,7 @@ int main(int argc, char *argv[])
 			else
 				dev_idx++;
 			jesd_move_device(old_idx, dev_idx, simple);
-		} else if (c == 'a') {
+		} else if (c == up_key) {
 			int old_idx = dev_idx;
 			if (!dev_idx)
 				dev_idx = dev_num - 1;
