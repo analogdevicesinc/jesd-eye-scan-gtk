@@ -423,7 +423,7 @@ int main(int argc, char *argv[])
 
 	dev_num = jesd_find_devices(basedir, JESD204_DEVICE_NAME, jesd_devices);
 	if (!dev_num) {
-		fprintf(stderr, "Failed to find JESD devices");
+		fprintf(stderr, "Failed to find JESD devices\n");
 		return 0;
 	}
 

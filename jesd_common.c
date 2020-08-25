@@ -64,7 +64,7 @@ int jesd_find_devices(const char *basedir, const char *name,
 	int num = 0;
 
 	if (dr == NULL) {
-		fprintf(stderr, "Could not open current directory");
+		fprintf(stderr, "Could not open current directory\n");
 		return 0;
 	}
 
