@@ -67,9 +67,6 @@
 
 #include "jesd_common.h"
 
-#define JESD204_DEVICE_NAME 	"axi-jesd204-"
-#define XCVR_DEVICE_NAME 	"axi-adxcvr-rx"
-
 char basedir[PATH_MAX];
 unsigned remote = 0;
 guint timer;
@@ -627,6 +624,9 @@ int read_eyescan_info(const char *basedir,
 	if (pFile == NULL) {
 		print_output_sys(stderr, "Failed to read JESD204 device file: %s\n",
 				 temp);
+
+		print_output_sys(stderr, "Select axi-adxcvr-rx device!\n");
+
 		return -errno;
 	}
 
