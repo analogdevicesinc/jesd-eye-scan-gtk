@@ -61,7 +61,7 @@
 
 #define JESD204_RX_DRIVER_NAME	"axi-jesd204-rx"
 #define JESD204_TX_DRIVER_NAME	"axi-jesd204-tx"
-#define XCVR_DRIVER_NAME	"axi_adxcvr_drv"
+#define XCVR_DRIVER_NAME	"axi_adxcvr"
 
 struct jesd204b_laneinfo {
 	unsigned did;		/* DID Device ID */
