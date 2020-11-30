@@ -66,7 +66,7 @@ char basedir[PATH_MAX];
 char jesd_devices[MAX_DEVICES][PATH_MAX];
 WINDOW *main_win, *stat_win, *dev_win, *lane_win;
 
-static const char *link_status_lables[] = {
+static const char *link_status_labels[] = {
 	"Link is",
 	"Link Status",
 	"Measured Link Clock",
@@ -80,7 +80,7 @@ static const char *link_status_lables[] = {
 	NULL
 };
 
-static const char *link_status_lables_64b66b[] = {
+static const char *link_status_labels_64b66b[] = {
 	"Link is",
 	"Link Status",
 	"Measured Link Clock",
@@ -93,7 +93,7 @@ static const char *link_status_lables_64b66b[] = {
 	NULL
 };
 
-static const char *lane_status_lables[] = {
+static const char *lane_status_labels[] = {
 	"Lane#",
 	"Errors",
 	"Latency (Multiframes/Octets)",
@@ -103,7 +103,7 @@ static const char *lane_status_lables[] = {
 	NULL
 };
 
-static const char *lane_status_lables_64b66b[] = {
+static const char *lane_status_labels_64b66b[] = {
 	"Lane#",
 	"Errors",
 	"Extended multiblock alignment",
@@ -321,14 +321,14 @@ int jesd_update_status(WINDOW *win, int x, const char *device)
 	return pos + COL_SPACEING;
 }
 
-int jesd_setup_subwin(WINDOW *win, const char *name, const char **lables)
+int jesd_setup_subwin(WINDOW *win, const char *name, const char **labels)
 {
 	int i = 0, pos = 0;
 
 	mvwprintw(win, 0, 1, name);
 
-	while (lables[i]) {
-		pos = jesd_maxx(pos, jesd_print_win(win, i + 1, 1, C_NORM, lables[i], false));
+	while (labels[i]) {
+		pos = jesd_maxx(pos, jesd_print_win(win, i + 1, 1, C_NORM, labels[i], false));
 		i++;
 	}
 
@@ -442,10 +442,10 @@ int main(int argc, char *argv[])
 	getmaxyx(stdscr, termy, termx);
 	main_win = newwin(termy, termx, 0, 0);
 	dev_win = newwin(dev_num + 3, termx - 2, 1, 1);
-	stat_win = newwin(ARRAY_SIZE(link_status_lables) + 1, termx - 2, dev_num + 4,
+	stat_win = newwin(ARRAY_SIZE(link_status_labels) + 1, termx - 2, dev_num + 4,
 			  1);
-	lane_win = newwin(ARRAY_SIZE(lane_status_lables) + 1, termx - 2,
-			  dev_num + ARRAY_SIZE(link_status_lables) + 5, 1);
+	lane_win = newwin(ARRAY_SIZE(lane_status_labels) + 1, termx - 2,
+			  dev_num + ARRAY_SIZE(link_status_labels) + 5, 1);
 
 	if (!simple) {
 		box(dev_win, 0, 0);
@@ -481,9 +481,9 @@ int main(int argc, char *argv[])
 
 		encoder = read_encoding(get_full_device_path(basedir, jesd_devices[dev_idx]));
 		if (encoder == JESD204_ENCODER_8B10B)
-			x = jesd_setup_subwin(stat_win, "(STATUS)", link_status_lables);
+			x = jesd_setup_subwin(stat_win, "(STATUS)", link_status_labels);
 		else
-			x = jesd_setup_subwin(stat_win, "(STATUS)", link_status_lables_64b66b);
+			x = jesd_setup_subwin(stat_win, "(STATUS)", link_status_labels_64b66b);
 
 		jesd_update_status(stat_win, x, jesd_devices[dev_idx]);
 		jesd_redo_r_box(stat_win, simple);
@@ -495,9 +495,9 @@ int main(int argc, char *argv[])
 				box(lane_win, 0, 0);
 
 			if (encoder == JESD204_ENCODER_8B10B)
-				x = jesd_setup_subwin(lane_win, "(LANE STATUS)", lane_status_lables);
+				x = jesd_setup_subwin(lane_win, "(LANE STATUS)", lane_status_labels);
 			else
-				x = jesd_setup_subwin(lane_win, "(LANE STATUS)", lane_status_lables_64b66b);
+				x = jesd_setup_subwin(lane_win, "(LANE STATUS)", lane_status_labels_64b66b);
 
 			update_lane_status(lane_win, x + 1, lane_info, cnt);
 			jesd_redo_r_box(lane_win, simple);
