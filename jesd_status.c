@@ -71,6 +71,9 @@ static const char *link_status_labels[] = {
 	"Link Status",
 	"Measured Link Clock (MHz)",
 	"Reported Link Clock (MHz)",
+	"Measured Device Clock (MHz)",
+	"Reported Device Clock (MHz)",
+	"Desired Device Clock (MHz)",
 	"Lane rate (MHz)",
 	"Lane rate / 40 (MHz)",
 	"LMFC rate (MHz)",
@@ -85,6 +88,9 @@ static const char *link_status_labels_64b66b[] = {
 	"Link Status",
 	"Measured Link Clock (MHz)",
 	"Reported Link Clock (MHz)",
+	"Measured Device Clock (MHz)",
+	"Reported Device Clock (MHz)",
+	"Desired Device Clock (MHz)",
 	"Lane rate (MHz)",
 	"Lane rate / 66 (MHz)",
 	"LEMC rate (MHz)",
@@ -275,7 +281,8 @@ int jesd_update_status(WINDOW *win, int x, const char *device)
 {
 	struct jesd204b_jesd204_status info;
 	float measured, reported, div40;
-	enum color_pairs c_measured_link_clock, c_lane_rate_div;
+	enum color_pairs c_measured_link_clock, c_lane_rate_div,
+		c_measured_device_clock, c_reported_device_clock;
 	int y = 1, pos = 0;
 
 	read_jesd204_status(get_full_device_path(basedir, device), &info);
@@ -296,6 +303,27 @@ int jesd_update_status(WINDOW *win, int x, const char *device)
 	else
 		c_lane_rate_div = C_GOOD;
 
+	if (info.measured_device_clock[0] != 'N') {
+		sscanf((char *)&info.measured_device_clock, "%f", &measured);
+		sscanf((char *)&info.reported_device_clock, "%f", &reported);
+		sscanf((char *)&info.desired_device_clock, "%f", &div40);
+
+		if (measured > (reported * (1 + PPM(CLOCK_ACCURACY))) ||
+		measured < (reported * (1 - PPM(CLOCK_ACCURACY))))
+			c_measured_device_clock = C_ERR;
+		else
+			c_measured_device_clock = C_GOOD;
+
+		if (reported > (div40 * (1 + PPM(CLOCK_ACCURACY))) ||
+		reported < (div40 * (1 - PPM(CLOCK_ACCURACY))))
+			c_reported_device_clock = C_ERR;
+		else
+			c_reported_device_clock = C_GOOD;
+	} else {
+		c_measured_device_clock = C_NORM;
+		c_reported_device_clock = C_NORM;
+	}
+
 	pos = jesd_maxx(pos, jesd_print_win_exp(win, y++, x, (char *)&info.link_state,
 						"enabled", 0, true));
 	pos = jesd_maxx(pos, jesd_print_win_exp(win, y++, x, (char *)&info.link_status,
@@ -304,6 +332,12 @@ int jesd_update_status(WINDOW *win, int x, const char *device)
 					    (char *)&info.measured_link_clock, true));
 	pos = jesd_maxx(pos, jesd_print_win(win, y++, x, C_NORM,
 					    (char *)&info.reported_link_clock, true));
+	pos = jesd_maxx(pos, jesd_print_win(win, y++, x, c_measured_device_clock,
+					    (char *)&info.measured_device_clock, true));
+	pos = jesd_maxx(pos, jesd_print_win(win, y++, x, c_reported_device_clock,
+					    (char *)&info.reported_device_clock, true));
+	pos = jesd_maxx(pos, jesd_print_win(win, y++, x, C_NORM,
+					    (char *)&info.desired_device_clock, true));
 	pos = jesd_maxx(pos, jesd_print_win(win, y++, x, C_NORM,
 					    (char *)&info.lane_rate, true));
 	pos = jesd_maxx(pos, jesd_print_win(win, y++, x, c_lane_rate_div,

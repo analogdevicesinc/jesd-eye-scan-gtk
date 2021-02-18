@@ -56,8 +56,8 @@
 #define MAX(a,b) (((a)>(b))?(a):(b))
 #define MIN(a,b) (((a)<(b))?(a):(b))
 
-#define        JESD204_ENCODER_8B10B   0
-#define        JESD204_ENCODER_64B66B  1
+#define JESD204_ENCODER_8B10B   0
+#define JESD204_ENCODER_64B66B  1
 
 #define JESD204_RX_DRIVER_NAME	"axi-jesd204-rx"
 #define JESD204_TX_DRIVER_NAME	"axi-jesd204-tx"
@@ -113,6 +113,9 @@ struct jesd204b_jesd204_status {
 	char link_state[MAX_SYSFS_STRING_SIZE];
 	char measured_link_clock[MAX_SYSFS_STRING_SIZE];
 	char reported_link_clock[MAX_SYSFS_STRING_SIZE];
+	char measured_device_clock[MAX_SYSFS_STRING_SIZE];
+	char reported_device_clock[MAX_SYSFS_STRING_SIZE];
+	char desired_device_clock[MAX_SYSFS_STRING_SIZE];
 	char lane_rate[MAX_SYSFS_STRING_SIZE];
 	char lane_rate_div[MAX_SYSFS_STRING_SIZE];
 	char lmfc_rate[MAX_SYSFS_STRING_SIZE];

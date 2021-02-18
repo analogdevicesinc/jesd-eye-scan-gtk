@@ -215,6 +215,13 @@ int read_all_laneinfo(const char *path, struct jesd204b_laneinfo lane_info[MAX_L
 	return cnt;
 }
 
+void set_not_availabe(char *str)
+{
+	str[0] = 'N';
+	str[1] = '/';
+	str[2] = 'A';
+	str[3] = 0;
+}
 
 int read_jesd204_status(const char *basedir,
 			struct jesd204b_jesd204_status *info)
@@ -245,6 +252,22 @@ int read_jesd204_status(const char *basedir,
 		     (char *)&info->measured_link_clock);
 	ret = fscanf(pFile, "Reported Link Clock: %s MHz\n",
 		     (char *)&info->reported_link_clock);
+
+	pos = ftell(pFile);
+	ret = fscanf(pFile, "Measured Device Clock: %s MHz\n",
+		     (char *)&info->measured_device_clock);
+
+	if (ret == 1) {
+		ret = fscanf(pFile, "Reported Device Clock: %s MHz\n",
+			(char *)&info->reported_device_clock);
+		ret = fscanf(pFile, "Desired Device Clock: %s MHz\n",
+			(char *)&info->desired_device_clock);
+	} else {
+		set_not_availabe(info->measured_device_clock);
+		set_not_availabe(info->reported_device_clock);
+		set_not_availabe(info->desired_device_clock);
+		fseek(pFile, pos, SEEK_SET);
+	}
 
 	pos = ftell(pFile);
 	ret = fscanf(pFile, "Lane rate: %s MHz\n", (char *)&info->lane_rate);
