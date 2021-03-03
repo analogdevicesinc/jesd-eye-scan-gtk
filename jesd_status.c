@@ -452,8 +452,8 @@ int main(int argc, char *argv[])
 
 	snprintf(basedir, sizeof(basedir), "%s/sys/bus/platform/drivers", path);
 
-	dev_num = jesd_find_devices(basedir, JESD204_RX_DRIVER_NAME, jesd_devices, 0);
-	dev_num = jesd_find_devices(basedir, JESD204_TX_DRIVER_NAME, jesd_devices, dev_num);
+	dev_num = jesd_find_devices(basedir, JESD204_RX_DRIVER_NAME, "status", jesd_devices, 0);
+	dev_num = jesd_find_devices(basedir, JESD204_TX_DRIVER_NAME, "status", jesd_devices, dev_num);
 	if (!dev_num) {
 		fprintf(stderr, "Failed to find JESD devices\n");
 		return 0;

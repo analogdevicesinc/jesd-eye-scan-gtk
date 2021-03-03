@@ -56,13 +56,15 @@ char *get_full_device_path(const char *basedir, const char *device)
 	return path;
 }
 
-int jesd_find_devices(const char *basedir, const char *driver,
+int jesd_find_devices(const char *basedir, const char *driver, const char *file_exists,
 		      char devices[MAX_DEVICES][PATH_MAX], int start)
 {
 	struct dirent *de;
+	struct stat sfile, efile;
 	char path[PATH_MAX];
+	char stat_path[PATH_MAX];
 	DIR *dr;
-	int num = start;
+	int num = start, use = 1;
 
 	snprintf(path, sizeof(path), "%s/%s", basedir, driver);
 	dr = opendir(path);
@@ -71,11 +73,25 @@ int jesd_find_devices(const char *basedir, const char *driver,
 		return 0;
 	}
 
-	while ((de = readdir(dr)) != NULL)
-		if (de->d_type == DT_LNK && num < MAX_DEVICES) {
+	while ((de = readdir(dr)) != NULL) {
+		snprintf(stat_path, sizeof(stat_path), "%s/%s", path, de->d_name);
+
+		if (lstat(stat_path, &sfile) == -1)
+			continue;
+
+		if (file_exists && S_ISLNK(sfile.st_mode)) {
+			snprintf(stat_path, sizeof(stat_path), "%s/%s/%s", path, de->d_name, file_exists);
+			if (stat(stat_path, &efile) == 0)
+				use = 1;
+			else
+				use = 0;
+		}
+
+		if (S_ISLNK(sfile.st_mode) && use && num < MAX_DEVICES) {
 			snprintf((char *)&devices[num], PATH_MAX, "%s/%s", driver, de->d_name);
 			num++;
 		}
+	}
 
 	closedir(dr);
 

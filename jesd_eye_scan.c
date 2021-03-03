@@ -260,11 +260,11 @@ static GtkWidget *create_view_and_model(unsigned active_lanes)
 	return view;
 }
 
-int get_devices(const char *path, const char *driver, GtkWidget *device_select)
+int get_devices(const char *path, const char *driver, const char *file,  GtkWidget *device_select)
 {
 	int dev_num, i;
 
-	dev_num = jesd_find_devices(path, driver, jesd_devices, 0);
+	dev_num = jesd_find_devices(path, driver, file, jesd_devices, 0);
 
 	for (i = 0; i < dev_num; i++)
 		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(device_select),
@@ -1244,9 +1244,9 @@ int main(int argc, char *argv[])
 	g_signal_connect(G_OBJECT(main_window), "destroy",
 	                 G_CALLBACK(gtk_main_quit), NULL);
 
-	get_devices(basedir, XCVR_DRIVER_NAME, device_select);
-	get_devices(basedir, JESD204_RX_DRIVER_NAME, jesd_core_selection);
-	get_devices(basedir, JESD204_TX_DRIVER_NAME, jesd_core_selection);
+	get_devices(basedir, XCVR_DRIVER_NAME, "eyescan_info", device_select);
+	get_devices(basedir, JESD204_RX_DRIVER_NAME, "status", jesd_core_selection);
+	get_devices(basedir, JESD204_TX_DRIVER_NAME, "status", jesd_core_selection);
 
 	logo = GTK_IMAGE(gtk_builder_get_object(builder, "logo"));
 
