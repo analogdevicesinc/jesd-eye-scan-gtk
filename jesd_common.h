@@ -56,8 +56,8 @@
 #define MAX(a,b) (((a)>(b))?(a):(b))
 #define MIN(a,b) (((a)<(b))?(a):(b))
 
-#define        JESD204_ENCODER_8B10B   0
-#define        JESD204_ENCODER_64B66B  1
+#define JESD204_ENCODER_8B10B   0
+#define JESD204_ENCODER_64B66B  1
 
 #define JESD204_RX_DRIVER_NAME	"axi-jesd204-rx"
 #define JESD204_TX_DRIVER_NAME	"axi-jesd204-tx"
@@ -113,6 +113,9 @@ struct jesd204b_jesd204_status {
 	char link_state[MAX_SYSFS_STRING_SIZE];
 	char measured_link_clock[MAX_SYSFS_STRING_SIZE];
 	char reported_link_clock[MAX_SYSFS_STRING_SIZE];
+	char measured_device_clock[MAX_SYSFS_STRING_SIZE];
+	char reported_device_clock[MAX_SYSFS_STRING_SIZE];
+	char desired_device_clock[MAX_SYSFS_STRING_SIZE];
 	char lane_rate[MAX_SYSFS_STRING_SIZE];
 	char lane_rate_div[MAX_SYSFS_STRING_SIZE];
 	char lmfc_rate[MAX_SYSFS_STRING_SIZE];
@@ -124,7 +127,7 @@ struct jesd204b_jesd204_status {
 };
 
 char *get_full_device_path(const char *basedir, const char *device);
-int jesd_find_devices(const char *basedir, const char *drvname,
+int jesd_find_devices(const char *basedir, const char *driver, const char *file_exists,
 		      char devices[MAX_DEVICES][PATH_MAX], int start);
 int read_laneinfo(const char *basedir, unsigned lane,
 		  struct jesd204b_laneinfo *info);
