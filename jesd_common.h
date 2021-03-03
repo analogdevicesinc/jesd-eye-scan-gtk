@@ -127,7 +127,7 @@ struct jesd204b_jesd204_status {
 };
 
 char *get_full_device_path(const char *basedir, const char *device);
-int jesd_find_devices(const char *basedir, const char *drvname,
+int jesd_find_devices(const char *basedir, const char *driver, const char *file_exists,
 		      char devices[MAX_DEVICES][PATH_MAX], int start);
 int read_laneinfo(const char *basedir, unsigned lane,
 		  struct jesd204b_laneinfo *info);
