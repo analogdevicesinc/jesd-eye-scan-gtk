@@ -60,7 +60,9 @@ int jesd_find_devices(const char *basedir, const char *driver,
 		      char devices[MAX_DEVICES][PATH_MAX], int start)
 {
 	struct dirent *de;
+	struct stat sfile;
 	char path[PATH_MAX];
+	char stat_path[PATH_MAX];
 	DIR *dr;
 	int num = start;
 
@@ -71,11 +73,17 @@ int jesd_find_devices(const char *basedir, const char *driver,
 		return 0;
 	}
 
-	while ((de = readdir(dr)) != NULL)
-		if (de->d_type == DT_LNK && num < MAX_DEVICES) {
+	while ((de = readdir(dr)) != NULL) {
+		snprintf(stat_path, sizeof(stat_path), "%s/%s", path, de->d_name);
+
+		if (lstat(stat_path, &sfile) == -1)
+			continue;
+
+		if (S_ISLNK(sfile.st_mode) && num < MAX_DEVICES) {
 			snprintf((char *)&devices[num], PATH_MAX, "%s/%s", driver, de->d_name);
 			num++;
 		}
+	}
 
 	closedir(dr);
 
