@@ -22,6 +22,7 @@ install:
 	install ./jesd_eye_scan_autostart.sh $(DESTDIR)/bin/
 	install ./jesd.glade $(DESTDIR)/share/jesd/
 	install ./icons/ADIlogo.png $(DESTDIR)/share/jesd/
+	mkdir -p ${HOME}/.config/autostart
 	install jesd_eye_scan.desktop $(HOME)/.config/autostart/jesd_eye_scan.desktop
 
 clean:
