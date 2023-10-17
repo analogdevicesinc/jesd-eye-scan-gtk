@@ -179,7 +179,7 @@ int jesd_print_win(WINDOW *win, int y, int x, enum color_pairs c,
 		jesd_clear_line_from(win, y, x);
 
 	wcolor_set(win, c, NULL);
-	mvwprintw(win, y, x, str);
+	mvwprintw(win, y, x, "%s", str);
 	wcolor_set(win, C_NORM, NULL);
 
 	return jesd_get_strlen(win, x);
@@ -359,7 +359,7 @@ int jesd_setup_subwin(WINDOW *win, const char *name, const char **labels)
 {
 	int i = 0, pos = 0;
 
-	mvwprintw(win, 0, 1, name);
+	mvwprintw(win, 0, 1, "%s", name);
 
 	while (labels[i]) {
 		pos = jesd_maxx(pos, jesd_print_win(win, i + 1, 1, C_NORM, labels[i], false));
