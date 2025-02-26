@@ -272,7 +272,7 @@ int get_devices(const char *path, const char *driver, const char *file,  GtkWidg
 
 	gtk_combo_box_set_active(GTK_COMBO_BOX(device_select), 0);
 
-	return 0;
+	return dev_num;
 }
 
 int print_output_sys(void *err, const char *str, ...)
@@ -1244,7 +1244,9 @@ int main(int argc, char *argv[])
 	g_signal_connect(G_OBJECT(main_window), "destroy",
 	                 G_CALLBACK(gtk_main_quit), NULL);
 
-	get_devices(basedir, XCVR_DRIVER_NAME, "eyescan_info", device_select);
+	if (!get_devices(basedir, XCVR_DRIVER_NAME, "eyescan_info", device_select)) {
+		get_devices(basedir, XCVR_NEW_DRIVER_NAME, "eyescan_info", device_select);
+	}
 	get_devices(basedir, JESD204_RX_DRIVER_NAME, "status", jesd_core_selection);
 	get_devices(basedir, JESD204_TX_DRIVER_NAME, "status", jesd_core_selection);
 
