@@ -1,10 +1,10 @@
 
 [Desktop Entry]
 Type=Application
-Exec=/usr/local/bin/jesd_eye_scan_autostart.sh
+Exec=/usr/local/bin/jesd_eye_scan
+Icon=/usr/local/share/jesd/ADIlogo.png
 Hidden=false
 NoDisplay=false
-X-GNOME-Autostart-enabled=true
 Name[C]=jesd_eye_scan
 Name=jesd_eye_scan
 Comment[C]=JESD EYE SCAN
