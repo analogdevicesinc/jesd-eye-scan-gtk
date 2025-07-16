@@ -1,5 +1,23 @@
 cmake_minimum_required(VERSION 3.10)
-project(jesd-eye-scan-gtk VERSION 1.0.0 LANGUAGES C)
+# Default version
+set(DEFAULT_PROJECT_VERSION "1.0.0")
+# Use provided version, or default
+if(NOT DEFINED PROJECT_VERSION)
+    set(PROJECT_VERSION "${DEFAULT_PROJECT_VERSION}" CACHE STRING "Full project version (MAJOR.MINOR.PATCH)")
+endif()
+
+# Split into components
+string(REPLACE "." ";" VERSION_LIST ${PROJECT_VERSION})
+
+# Extract version components
+list(GET VERSION_LIST 0 PROJECT_VERSION_MAJOR)
+list(GET VERSION_LIST 1 PROJECT_VERSION_MINOR)
+list(GET VERSION_LIST 2 PROJECT_VERSION_PATCH)
+
+set(PROJECT_VERSION_DEB "${PROJECT_VERSION_MAJOR}.${PROJECT_VERSION_MINOR}.${PROJECT_VERSION_PATCH}")
+message(STATUS "Using Debian compatible version: ${PROJECT_VERSION_DEB}")
+
+project(jesd-eye-scan-gtk LANGUAGES C)
 
 # Set C standard
 set(CMAKE_C_STANDARD 99)
@@ -72,10 +90,6 @@ install(TARGETS jesd_status jesd_eye_scan
     RUNTIME DESTINATION bin
 )
 
-install(PROGRAMS jesd_eye_scan_autostart.sh
-    DESTINATION bin
-)
-
 install(FILES jesd.glade
     DESTINATION share/jesd/
 )
@@ -84,13 +98,9 @@ install(FILES icons/ADIlogo.png
     DESTINATION share/jesd/
 )
 
-# Install desktop file to user's autostart directory
-install(CODE "
-    execute_process(COMMAND \${CMAKE_COMMAND} -E make_directory \$ENV{HOME}/.config/autostart)
-    execute_process(COMMAND \${CMAKE_COMMAND} -E copy 
-        \${CMAKE_SOURCE_DIR}/jesd_eye_scan.desktop
-        \$ENV{HOME}/.config/autostart/jesd_eye_scan.desktop)
-")
+install(FILES "jesd_eye_scan.desktop"
+    DESTINATION share/applications/
+)
 
 # Add custom clean target to match Makefile behavior
 add_custom_target(clean-extra
@@ -98,3 +108,13 @@ add_custom_target(clean-extra
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     COMMENT "Removing additional generated files"
 )
+
+option(ENABLE_PACKAGING "Create .deb packages via 'make package'" OFF)
+if(ENABLE_PACKAGING)
+	if(${CMAKE_SYSTEM_NAME} MATCHES "Linux")
+		include(${CMAKE_CURRENT_SOURCE_DIR}/cmake_linux_packaging.cmake)
+	endif()
+endif()
+
+
+
