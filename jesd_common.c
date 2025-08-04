@@ -160,12 +160,12 @@ int read_laneinfo(const char *basedir, unsigned lane,
 	if (encoder == JESD204_ENCODER_64B66B) {
 
 
-	ret += fscanf(pFile, "State of Extended multiblock alignment:%s\n",
-			(char *)&info->ext_multiblock_align_state);
-	/* Ignore return value since optional */
-	fscanf(pFile, "Lane Latency: %u (min/max %u/%u)n",
-		      &info->lane_latency_octets,
-		      &info->lane_latency_min, &info->lane_latency_max);
+		ret += fscanf(pFile, "State of Extended multiblock alignment:%s\n",
+			      (char *)&info->ext_multiblock_align_state);
+		/* Ignore return value since optional */
+		fscanf(pFile, "Lane Latency: %u (min/max %u/%u)n",
+		       &info->lane_latency_octets,
+		       &info->lane_latency_min, &info->lane_latency_max);
 
 		goto close_f;
 	};
@@ -232,9 +232,8 @@ int read_all_laneinfo(const char *path, struct jesd204b_laneinfo lane_info[MAX_L
 
 				return cnt;
 
-			} else {
+			} else
 				cnt++;
-			}
 		}
 	} else {
 		fprintf(stderr, "Failed to find JESD device: %s\n", path);
@@ -288,9 +287,9 @@ int read_jesd204_status(const char *basedir,
 
 	if (ret == 1) {
 		ret = fscanf(pFile, "Reported Device Clock: %s MHz\n",
-			(char *)&info->reported_device_clock);
+			     (char *)&info->reported_device_clock);
 		ret = fscanf(pFile, "Desired Device Clock: %s MHz\n",
-			(char *)&info->desired_device_clock);
+			     (char *)&info->desired_device_clock);
 	} else {
 		set_not_availabe(info->measured_device_clock);
 		set_not_availabe(info->reported_device_clock);

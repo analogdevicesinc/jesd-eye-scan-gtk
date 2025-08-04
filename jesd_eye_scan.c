@@ -185,58 +185,58 @@ static int create_and_fill_model(unsigned active_lanes, int encoder)
 		gtk_tree_store_set(treestore, &toplevel, COLUMN, temp, -1);
 
 		JESD204_TREE_STORE_NEW_ROW_VALF("Lane Rate (Gbps)",
-		                                (double)get_lane_rate(lane) /
-		                                1000000000);
+						(double)get_lane_rate(lane) /
+						1000000000);
 
 		JESD204_TREE_STORE_NEW_ROW_VAL("Device ID (DID)",
-		                               lane_info[lane].did);
+					       lane_info[lane].did);
 		JESD204_TREE_STORE_NEW_ROW_VAL("Bank ID (BID)",
-		                               lane_info[lane].bid);
+					       lane_info[lane].bid);
 		JESD204_TREE_STORE_NEW_ROW_VAL("Lane ID (LID)",
-		                               lane_info[lane].lid);
+					       lane_info[lane].lid);
 
 		JESD204_TREE_STORE_NEW_ROW_VAL("JESD204 Version",
-		                               lane_info[lane].jesdv);
+					       lane_info[lane].jesdv);
 		JESD204_TREE_STORE_NEW_ROW_VAL("JESD204 subclass version",
-		                               lane_info[lane].subclassv);
+					       lane_info[lane].subclassv);
 
 		JESD204_TREE_STORE_NEW_ROW_VAL("Number of Lanes per Device (L)",
-		                               lane_info[lane].l);
+					       lane_info[lane].l);
 		JESD204_TREE_STORE_NEW_ROW_VAL("Octets per Frame (F)",
-		                               lane_info[lane].f);
+					       lane_info[lane].f);
 		JESD204_TREE_STORE_NEW_ROW_VAL("Frames per Multiframe (K)",
-		                               lane_info[lane].k);
+					       lane_info[lane].k);
 		JESD204_TREE_STORE_NEW_ROW_VAL("Converters per Device (M)",
-		                               lane_info[lane].m);
+					       lane_info[lane].m);
 		JESD204_TREE_STORE_NEW_ROW_VAL("Converter Resolution (N)",
-		                               lane_info[lane].n);
+					       lane_info[lane].n);
 
 		JESD204_TREE_STORE_NEW_ROW_VAL("Control Bits per Sample (CS)",
-		                               lane_info[lane].cs);
+					       lane_info[lane].cs);
 		JESD204_TREE_STORE_NEW_ROW_VAL
 		("Samples per Converter per Frame Cycle (S)",
 		 lane_info[lane].s);
 		JESD204_TREE_STORE_NEW_ROW_VAL("Total Bits per Sample (N')",
-		                               lane_info[lane].nd);
+					       lane_info[lane].nd);
 
 		JESD204_TREE_STORE_NEW_ROW_VAL
 		("Control Words per Frame Cycle per Link (CF)",
 		 lane_info[lane].cf);
 		JESD204_TREE_STORE_NEW_ROW_STRING("Scrambling (SCR)",
-		                                  lane_info[lane].
-		                                  scr ? "Enabled" : "Disabled");
+						  lane_info[lane].
+						  scr ? "Enabled" : "Disabled");
 		JESD204_TREE_STORE_NEW_ROW_STRING("High Density Format (HD)",
-		                                  lane_info[lane].
-		                                  hd ? "Enabled" : "Disabled");
+						  lane_info[lane].
+						  hd ? "Enabled" : "Disabled");
 
 		JESD204_TREE_STORE_NEW_ROW_VAL("Checksum (FCHK)",
-		                               lane_info[lane].fchk);
+					       lane_info[lane].fchk);
 		JESD204_TREE_STORE_NEW_ROW_VAL("ADJCNT Adjustment step count",
-		                               lane_info[lane].adjcnt);
+					       lane_info[lane].adjcnt);
 		JESD204_TREE_STORE_NEW_ROW_VAL("PHYADJ Adjustment request",
-		                               lane_info[lane].phyadj);
+					       lane_info[lane].phyadj);
 		JESD204_TREE_STORE_NEW_ROW_VAL("ADJDIR Adjustment direction",
-		                               lane_info[lane].adjdir);
+					       lane_info[lane].adjdir);
 	}
 
 	gtk_tree_view_set_model(GTK_TREE_VIEW(view), GTK_TREE_MODEL(treestore));
@@ -300,13 +300,13 @@ int print_output_sys(void *err, const char *str, ...)
 	if (err == stderr) {
 		fprintf(stderr, buf, NULL);
 		gtk_text_buffer_insert_with_tags_by_name(buffer, &iter,
-		                buf, -1, "red_bg",
-		                "lmarg", "bold", NULL);
+							 buf, -1, "red_bg",
+							 "lmarg", "bold", NULL);
 	} else if (err == stdout) {
 		fprintf(stdout, buf, NULL);
 		gtk_text_buffer_insert_with_tags_by_name(buffer, &iter,
-		                buf, -1, "bold",
-		                "lmarg", NULL);
+							 buf, -1, "bold",
+							 "lmarg", NULL);
 	}
 
 	/* Fix warning: variable ‘len’ set but not used [-Wunused-but-set-variable] */
@@ -314,8 +314,8 @@ int print_output_sys(void *err, const char *str, ...)
 }
 
 static void analyse(struct jesd204b_xcvr_eyescan_info *info,
-                    unsigned long long *data, unsigned int width,
-                    unsigned int height, FILE *gp)
+		    unsigned long long *data, unsigned int width,
+		    unsigned int height, FILE *gp)
 {
 	unsigned *data_u32 = (unsigned *)data;
 	unsigned int x, y;
@@ -361,17 +361,17 @@ static void analyse(struct jesd204b_xcvr_eyescan_info *info,
 
 	fprintf(gp, "set label 'Eye-Opening:' at -0.48,-90 front\n");
 	fprintf(gp, "set label 'H: %.3f (UI)' at -0.48,-105 front\n",
-	        (float)xmax / ((float)info->es_hsize) - (float)xmin / ((float)info->es_hsize));
+		(float)xmax / ((float)info->es_hsize) - (float)xmin / ((float)info->es_hsize));
 	fprintf(gp, "set label 'V: %d (CODES)' at -0.48,-120 front\n",
-	        ymax - ymin);
+		ymax - ymin);
 
 	print_output_sys(stdout, "   H: %.3f (UI)\n",
-	                 (float)xmax / ((float)info->es_hsize)  - (float)xmin / ((float)info->es_hsize));
+			 (float)xmax / ((float)info->es_hsize)  - (float)xmin / ((float)info->es_hsize));
 	print_output_sys(stdout, "   V: %d (CODES)\n", ymax - ymin);
 }
 
 double calc_ber(struct jesd204b_xcvr_eyescan_info *info,
-                unsigned long long smpl, unsigned prescale)
+		unsigned long long smpl, unsigned prescale)
 {
 	unsigned long long err_ut0, err_ut1, cnt_ut0, cnt_ut1;
 	double ber;
@@ -394,8 +394,8 @@ double calc_ber(struct jesd204b_xcvr_eyescan_info *info,
 
 		if ((err_ut0 + err_ut1) == 0)
 			ber =
-			        1 / (double)((info->cdr_data_width << (1 + prescale)) *
-			                     (cnt_ut0 + cnt_ut1));
+				1 / (double)((info->cdr_data_width << (1 + prescale)) *
+					     (cnt_ut0 + cnt_ut1));
 		else
 			ber = (err_ut0 * cnt_ut1 + err_ut1 * cnt_ut0) /
 			      (double)(2 * (info->cdr_data_width << (1 + prescale)) * cnt_ut0 * cnt_ut1);
@@ -405,7 +405,7 @@ double calc_ber(struct jesd204b_xcvr_eyescan_info *info,
 }
 
 int plot(struct jesd204b_xcvr_eyescan_info *info, char *file, unsigned lane,
-         unsigned p, char *file_png)
+	 unsigned p, char *file_png)
 {
 	static FILE *gp = NULL;
 	int ret, i, cnt;
@@ -451,7 +451,7 @@ int plot(struct jesd204b_xcvr_eyescan_info *info, char *file, unsigned lane,
 		 * https://stackoverflow.com/questions/41209199/cannot-embed-gnuplot-x11-window-into-gtk3-socket
 		 */
 		fprintf(gp, "set term x11 window \"%x\"\n",
-		        (unsigned int)gtk_socket_get_id(GTK_SOCKET(sock)));
+			(unsigned int)gtk_socket_get_id(GTK_SOCKET(sock)));
 		fprintf(gp, "set mouse nozoomcoordinates\n");
 		fprintf(gp, "set autoscale\n");
 	} else {
@@ -466,25 +466,25 @@ int plot(struct jesd204b_xcvr_eyescan_info *info, char *file, unsigned lane,
 	fprintf(gp, "set xlabel 'Horizontal Offset (UI)'\n");
 	fprintf(gp, "set palette rgbformulae 7,5,15\n");
 	fprintf(gp, "set title '"
-	        "JESD204 Lane%i @ %.2f Gbps %s (Max BER %.1e)'\n",
-	        lane, (double)info->lane_rate / 1000000, info->lpm ? "LPM" : "DFE",
-	        calc_ber(info, 0xFFFF0000FFFF0000, p));
+		"JESD204 Lane%i @ %.2f Gbps %s (Max BER %.1e)'\n",
+		lane, (double)info->lane_rate / 1000000, info->lpm ? "LPM" : "DFE",
+		calc_ber(info, 0xFFFF0000FFFF0000, p));
 
 	fprintf(gp,
-	        "set label 'Xilinx 2D Statistical Eye Scan' at graph 0.0,1.2 left front\n");
+		"set label 'Xilinx 2D Statistical Eye Scan' at graph 0.0,1.2 left front\n");
 
 	fprintf(gp, "set grid xtics ytics front lc rgb 'grey'\n");
 	fprintf(gp, "set cblabel 'BER 10E'\n");
 	fprintf(gp, "set cntrparam levels incremental -1,-1,%i\n",
-	        (int)log10(calc_ber(info, 0xFFFF0000FFFF0000, p)));
+		(int)log10(calc_ber(info, 0xFFFF0000FFFF0000, p)));
 	fprintf(gp,
-	        "set arrow from -0.175,0 to 0,22.5 nohead front lw 1 lc rgb \'white\'\n");
+		"set arrow from -0.175,0 to 0,22.5 nohead front lw 1 lc rgb \'white\'\n");
 	fprintf(gp,
-	        "set arrow from 0,22.5 to 0.175,0 nohead front lw 1 lc rgb \'white\'\n");
+		"set arrow from 0,22.5 to 0.175,0 nohead front lw 1 lc rgb \'white\'\n");
 	fprintf(gp,
-	        "set arrow from 0.175,0 to 0,-22.5 nohead front lw 1 lc rgb \'white\'\n");
+		"set arrow from 0.175,0 to 0,-22.5 nohead front lw 1 lc rgb \'white\'\n");
 	fprintf(gp,
-	        "set arrow from 0,-22.5 to -0.175,0 nohead front lw 1 lc rgb \'white\'\n");
+		"set arrow from 0,-22.5 to -0.175,0 nohead front lw 1 lc rgb \'white\'\n");
 	fprintf(gp, "set label 'MASK' at 0,0 center front tc rgb 'white'\n");
 
 	pFile = fopen(file, "r");
@@ -508,9 +508,9 @@ int plot(struct jesd204b_xcvr_eyescan_info *info, char *file, unsigned lane,
 		}
 
 		fprintf(gp, "%f %f %e\n",
-		        ((float)(i / info->es_hsize) - (info->es_vsize / 2)),
-		        ((float)(i % info->es_hsize) - (info->es_hsize / 2)) / (info->es_hsize - 1),
-		        calc_ber(info, info->lpm ? buf_lpm[i] : buf[i], p));
+			((float)(i / info->es_hsize) - (info->es_vsize / 2)),
+			((float)(i % info->es_hsize) - (info->es_hsize / 2)) / (info->es_hsize - 1),
+			calc_ber(info, info->lpm ? buf_lpm[i] : buf[i], p));
 
 	}
 
@@ -544,7 +544,7 @@ int write_sysfs(char *filename, char *basedir, char *val)
 }
 
 int get_eye_data(struct jesd204b_xcvr_eyescan_info *info, char *filename,
-                 char *basedir, char *filename_out)
+		 char *basedir, char *filename_out)
 {
 	FILE *sysfsfp, *pFile;
 	char temp[PATH_MAX];
@@ -607,7 +607,7 @@ int get_eye_data(struct jesd204b_xcvr_eyescan_info *info, char *filename,
 }
 
 int get_eye(struct jesd204b_xcvr_eyescan_info *info, unsigned lane,
-            unsigned prescale)
+	    unsigned prescale)
 {
 	char temp[64];
 	int ret;
@@ -631,11 +631,11 @@ int get_eye(struct jesd204b_xcvr_eyescan_info *info, unsigned lane,
 	}
 
 	snprintf(temp, sizeof(temp), "Lane %d : %.2e",
-	        lane, calc_ber(info, 0xFFFF0000FFFF0000, prescale));
+		 lane, calc_ber(info, 0xFFFF0000FFFF0000, prescale));
 
 	/* gdk_threads_enter() is deprecated */
 	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(finished_eyes),
-	                               (const gchar *)temp);
+				       (const gchar *)temp);
 
 	if (!is_first) {
 		gtk_combo_box_set_active(GTK_COMBO_BOX(finished_eyes), 0);
@@ -648,7 +648,7 @@ int get_eye(struct jesd204b_xcvr_eyescan_info *info, unsigned lane,
 }
 
 int read_eyescan_info(const char *basedir,
-                      struct jesd204b_xcvr_eyescan_info *info)
+		      struct jesd204b_xcvr_eyescan_info *info)
 {
 	FILE *pFile;
 	char temp[PATH_MAX];
@@ -667,8 +667,8 @@ int read_eyescan_info(const char *basedir,
 	}
 
 	ret = fscanf(pFile, "x%d,y%d CDRDW: %llu LPM: %d NL: %d LR: %lu\n",
-	             &info->es_hsize, &info->es_vsize, &info->cdr_data_width,
-	             &info->lpm, &info->num_lanes, &info->lane_rate);
+		     &info->es_hsize, &info->es_vsize, &info->cdr_data_width,
+		     &info->lpm, &info->num_lanes, &info->lane_rate);
 
 	fclose(pFile);
 
@@ -707,7 +707,7 @@ void *worker(void *args)
 
 	for (p = pmin; p <= pmax; p++) {
 		gtk_progress_bar_set_fraction(GTK_PROGRESS_BAR(progressbar1),
-		                              (float)(i++) / ((pmax - pmin) ? (pmax - pmin) : 1));
+					      (float)(i++) / ((pmax - pmin) ? (pmax - pmin) : 1));
 
 		for (l = 0; l < MAX_LANES; l++)
 			if (lane_en & (1 << l)) {
@@ -753,7 +753,7 @@ void save_plot_pressed_cb(GtkButton *button, gpointer user_data)
 	for (i = 0; i <= MAX_PRESCALE; i++) {
 		tmp2 = calc_ber(info, 0xFFFF0000FFFF0000, i);
 		places = pow(10.0, round(abs(log10(tmp2))));
-		tmp2 = (round(tmp2 * places * 1000.0))/(places * 1000.0);
+		tmp2 = (round(tmp2 * places * 1000.0)) / (places * 1000.0);
 
 		if (tmp2 == tmp) {
 			prescale = i;
@@ -776,14 +776,14 @@ void save_plot_pressed_cb(GtkButton *button, gpointer user_data)
 	g_free(item);  /* Free the GTK allocated string */
 
 	dialog = gtk_file_chooser_dialog_new("Save File",
-	                                     NULL,
-	                                     GTK_FILE_CHOOSER_ACTION_SAVE,
-	                                     "_Cancel",
-	                                     GTK_RESPONSE_CANCEL,
-	                                     "_Save",
-	                                     GTK_RESPONSE_ACCEPT, NULL);
+					     NULL,
+					     GTK_FILE_CHOOSER_ACTION_SAVE,
+					     "_Cancel",
+					     GTK_RESPONSE_CANCEL,
+					     "_Save",
+					     GTK_RESPONSE_ACCEPT, NULL);
 	gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog),
-	                TRUE);
+						       TRUE);
 
 	gtk_file_chooser_set_current_folder(GTK_FILE_CHOOSER(dialog), "./");
 	gtk_file_chooser_set_current_name(GTK_FILE_CHOOSER(dialog), temp);
@@ -792,7 +792,7 @@ void save_plot_pressed_cb(GtkButton *button, gpointer user_data)
 		char *filename;
 
 		filename =
-		        gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
+			gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
 		plot(info, eye_filename, lane, prescale, filename);
 		g_free(filename);
 
@@ -803,13 +803,13 @@ void save_plot_pressed_cb(GtkButton *button, gpointer user_data)
 
 void show_pressed_cb(GtkButton *button, gpointer user_data)
 {
-	unsigned lane, prescale=0;
+	unsigned lane, prescale = 0;
 	double tmp, tmp2, places;
 	unsigned int i;
 
 	gchar *item =
-	        gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT
-	                        (finished_eyes));
+		gtk_combo_box_text_get_active_text(GTK_COMBO_BOX_TEXT
+						   (finished_eyes));
 
 	if (item == NULL) {
 		return;
@@ -834,7 +834,7 @@ void show_pressed_cb(GtkButton *button, gpointer user_data)
 	for (i = 0; i <= MAX_PRESCALE; i++) {
 		tmp2 = calc_ber(info, 0xFFFF0000FFFF0000, i);
 		places = pow(10.0, round(abs(log10(tmp2))));
-		tmp2 = (round(tmp2 * places * 1000.0))/(places * 1000.0);
+		tmp2 = (round(tmp2 * places * 1000.0)) / (places * 1000.0);
 
 		if (tmp2 == tmp) {
 			prescale = i;
@@ -847,9 +847,9 @@ void show_pressed_cb(GtkButton *button, gpointer user_data)
 	snprintf(eye_filename, sizeof(eye_filename), "lane%d_p%d.eye", lane, prescale);
 
 	print_output_sys(stdout, "LANE%d P(%d) @ %.2f Gbps\n", lane, prescale,
-	                 (double)info->lane_rate / 1000000);
+			 (double)info->lane_rate / 1000000);
 	print_output_sys(stdout, "Eye Center:\n  ERR: 0 BER: %.3e\n",
-	                 calc_ber(info, 0xFFFF0000FFFF0000, prescale));
+			 calc_ber(info, 0xFFFF0000FFFF0000, prescale));
 
 	plot(info, eye_filename, lane, prescale, NULL);
 	g_free(item);  /* Use g_free for GTK allocated memory */
@@ -876,8 +876,8 @@ void start_pressed_cb(GtkButton *button, gpointer user_data)
 
 	work_run = 1;
 	gtk_list_store_clear(GTK_LIST_STORE
-	                     (gtk_combo_box_get_model
-	                      (GTK_COMBO_BOX(finished_eyes))));
+			     (gtk_combo_box_get_model
+			      (GTK_COMBO_BOX(finished_eyes))));
 	is_first = 0;
 	pthread_create(&work, NULL, worker, info);
 }
@@ -905,14 +905,14 @@ void device_select_pressed_cb(GtkComboBoxText *combo_box, gpointer user_data)
 	}
 
 	ret = snprintf(info->gt_interface_path, sizeof(info->gt_interface_path),
-	               "%s/%s", basedir, item);
+		       "%s/%s", basedir, item);
 
 	if (ret < 0) {
 		return;
 	}
 
 	gtk_list_store_clear(GTK_LIST_STORE(gtk_combo_box_get_model(GTK_COMBO_BOX(
-	                finished_eyes))));
+									    finished_eyes))));
 	text_view_delete();
 
 	ret = read_eyescan_info(info->gt_interface_path, info);
@@ -927,11 +927,11 @@ void device_select_pressed_cb(GtkComboBoxText *combo_box, gpointer user_data)
 	/* Populate min/max BER combo boxes */
 	for (i = 0; i <= MAX_PRESCALE; i++) {
 		snprintf(temp, sizeof(temp), "%.2e",
-		        calc_ber(info, 0xFFFF0000FFFF0000, i));
+			 calc_ber(info, 0xFFFF0000FFFF0000, i));
 		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(min_ber),
-		                               (const gchar *)temp);
+					       (const gchar *)temp);
 		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(max_ber),
-		                               (const gchar *)temp);
+					       (const gchar *)temp);
 
 		if (i == 0) {
 			gtk_combo_box_set_active(GTK_COMBO_BOX(min_ber), 0);
@@ -953,14 +953,14 @@ void device_select_pressed_cb(GtkComboBoxText *combo_box, gpointer user_data)
 }
 
 GtkWidget *set_lable_text(GtkWidget *label, const char *text,
-                          const char *expected, unsigned invert)
+			  const char *expected, unsigned invert)
 {
 	GdkRGBA color;
 
 	if (g_strcmp0(text, expected)) {
 		color = (invert ? color_green : color_red);
 	} else {
-		color = (invert ? color_red: color_green);
+		color = (invert ? color_red : color_green);
 	}
 
 	if (label) {
@@ -1038,8 +1038,8 @@ GtkWidget *set_per_lane_status(struct jesd204b_laneinfo *info, unsigned lanes, i
 		octets_per_multifame = lane->k * lane->f;
 
 		latency_min = MIN(latency_min, octets_per_multifame *
-			lane->lane_latency_multiframes +
-			lane->lane_latency_octets);
+				  lane->lane_latency_multiframes +
+				  lane->lane_latency_octets);
 	}
 
 	grid = gtk_grid_new();
@@ -1087,7 +1087,7 @@ GtkWidget *set_per_lane_status(struct jesd204b_laneinfo *info, unsigned lanes, i
 
 				/* Latency */
 				g_snprintf(text, sizeof(text), "%d / %d", lane->lane_latency_multiframes,
-				           lane->lane_latency_octets);
+					   lane->lane_latency_octets);
 				label = set_lable_text(NULL, text, NULL, 0);
 				gtk_widget_override_color(label, GTK_STATE_FLAG_NORMAL, &color);
 				gtk_grid_attach(GTK_GRID(grid), label, i, j++, 1, 1);
@@ -1144,13 +1144,13 @@ int jesd_update_status(const char *path)
 	read_jesd204_status(path, &info);
 	encoder = read_encoding(path);
 
-	set_lable_text(link_state,(char *) &info.link_state, "enabled", 0);
+	set_lable_text(link_state, (char *) &info.link_state, "enabled", 0);
 	set_lable_text(link_status, (char *)&info.link_status, "DATA", 0);
 	set_lable_text(measured_link_clock, (char *)&info.measured_link_clock, NULL, 0);
 	set_lable_text(reported_link_clock, (char *)&info.reported_link_clock, NULL, 0);
 	set_lable_text(lane_rate, (char *)&info.lane_rate, NULL, 0);
-	set_lable_text(lane_rate_div,(char *) &info.lane_rate_div, NULL, 0);
-	set_lable_text(lmfc_rate,(char *) &info.lmfc_rate, NULL, 0);
+	set_lable_text(lane_rate_div, (char *) &info.lane_rate_div, NULL, 0);
+	set_lable_text(lmfc_rate, (char *) &info.lmfc_rate, NULL, 0);
 
 	/* SYNC~ is only available for 8B10B encoder */
 	if (encoder == JESD204_ENCODER_8B10B) {
@@ -1160,7 +1160,7 @@ int jesd_update_status(const char *path)
 	}
 	set_lable_text(sysref_captured, (char *)&info.sysref_captured, "No", 1);
 	set_lable_text(sysref_alignment_error, (char *)&info.sysref_alignment_error,
-	               "Yes", 1);
+		       "Yes", 1);
 
 	/* Device clock fields */
 	set_lable_text(measured_device_clock, (char *)&info.measured_device_clock, NULL, 0);
@@ -1172,7 +1172,7 @@ int jesd_update_status(const char *path)
 	sscanf((char *)&info.lane_rate_div, "%f", &div40);
 
 	if (measured > (reported * (1 + PPM(CLOCK_ACCURACY))) ||
-		measured < (reported * (1 - PPM(CLOCK_ACCURACY)))) {
+	    measured < (reported * (1 - PPM(CLOCK_ACCURACY)))) {
 		color = color_red;
 	} else {
 		color = color_green;
@@ -1181,7 +1181,7 @@ int jesd_update_status(const char *path)
 	gtk_widget_override_color(measured_link_clock, GTK_STATE_FLAG_NORMAL, &color);
 
 	if (reported > (div40 * (1 + PPM(CLOCK_ACCURACY))) ||
-		reported < (div40 * (1 - PPM(CLOCK_ACCURACY)))) {
+	    reported < (div40 * (1 - PPM(CLOCK_ACCURACY)))) {
 		color = color_red;
 	} else {
 		color = color_green;
@@ -1276,15 +1276,15 @@ int main(int argc, char *argv[])
 			break;
 
 		case '?':
-			if (optopt == 'd'|| optopt == 'p') {
+			if (optopt == 'd' || optopt == 'p') {
 				fprintf(stderr, "Option -%c requires an argument.\n", optopt);
 			} else if (isprint(optopt))
 				fprintf(stderr, "Unknown option `-%c'.\n%s [-p PATH] [-d DEVICEINDEX]\n",
-				        optopt, argv[0]);
+					optopt, argv[0]);
 			else
 				fprintf(stderr,
-				        "Unknown option character `\\x%x'.\n",
-				        optopt);
+					"Unknown option character `\\x%x'.\n",
+					optopt);
 
 			return 1;
 
@@ -1336,24 +1336,24 @@ int main(int argc, char *argv[])
 
 	link_state = GTK_WIDGET(gtk_builder_get_object(builder, "link_state"));
 	measured_link_clock = GTK_WIDGET(gtk_builder_get_object(builder,
-	                                 "measured_link_clock"));
+								"measured_link_clock"));
 	reported_link_clock = GTK_WIDGET(gtk_builder_get_object(builder,
-	                                 "reported_link_clock"));
+								"reported_link_clock"));
 	lane_rate = GTK_WIDGET(gtk_builder_get_object(builder, "lane_rate"));
 	lane_rate_div = GTK_WIDGET(gtk_builder_get_object(builder, "lane_rate_div"));
 	lmfc_rate = GTK_WIDGET(gtk_builder_get_object(builder, "lmfc_rate"));
 	sync_state = GTK_WIDGET(gtk_builder_get_object(builder, "sync_state"));
 	link_status = GTK_WIDGET(gtk_builder_get_object(builder, "link_status"));
 	sysref_captured = GTK_WIDGET(gtk_builder_get_object(builder,
-	                             "sysref_captured"));
+							    "sysref_captured"));
 	sysref_alignment_error = GTK_WIDGET(gtk_builder_get_object(builder,
-	                                    "sysref_alignment_error"));
+								   "sysref_alignment_error"));
 	measured_device_clock = GTK_WIDGET(gtk_builder_get_object(builder,
-	                                  "measured_device_clock"));
+								  "measured_device_clock"));
 	reported_device_clock = GTK_WIDGET(gtk_builder_get_object(builder,
-	                                  "reported_device_clock"));
+								  "reported_device_clock"));
 	desired_device_clock = GTK_WIDGET(gtk_builder_get_object(builder,
-	                                 "desired_device_clock"));
+								 "desired_device_clock"));
 
 	tview = GTK_WIDGET(gtk_builder_get_object(builder, "textview1"));
 
@@ -1361,15 +1361,15 @@ int main(int argc, char *argv[])
 	gtk_text_buffer_get_iter_at_offset(buffer, &iter, 0);
 	gtk_text_buffer_create_tag(buffer, "lmarg", "left_margin", 5, NULL);
 	gtk_text_buffer_create_tag(buffer, "blue_fg", "foreground", "blue",
-	                           NULL);
+				   NULL);
 	gtk_text_buffer_create_tag(buffer, "red_bg", "background", "red", NULL);
 	gtk_text_buffer_create_tag(buffer, "italic", "style",
-	                           PANGO_STYLE_ITALIC, NULL);
+				   PANGO_STYLE_ITALIC, NULL);
 	gtk_text_buffer_create_tag(buffer, "bold", "weight", PANGO_WEIGHT_BOLD,
-	                           NULL);
+				   NULL);
 
 	progressbar1 =
-	        GTK_WIDGET(gtk_builder_get_object(builder, "progressbar1"));
+		GTK_WIDGET(gtk_builder_get_object(builder, "progressbar1"));
 
 	box2 = GTK_WIDGET(gtk_builder_get_object(builder, "box2"));
 	sock = gtk_socket_new();
@@ -1386,7 +1386,7 @@ int main(int argc, char *argv[])
 	gtk_container_add(GTK_CONTAINER(box3), view);
 
 	finished_eyes =
-	        GTK_WIDGET(gtk_builder_get_object(builder, "comboboxtext1"));
+		GTK_WIDGET(gtk_builder_get_object(builder, "comboboxtext1"));
 	gtk_combo_box_text_remove(GTK_COMBO_BOX_TEXT(finished_eyes), 0);
 
 	min_ber = GTK_WIDGET(gtk_builder_get_object(builder, "comboboxtext2"));
@@ -1396,11 +1396,11 @@ int main(int argc, char *argv[])
 	gtk_combo_box_text_remove(GTK_COMBO_BOX_TEXT(max_ber), 0);
 
 	device_select = GTK_WIDGET(gtk_builder_get_object(builder,
-	                           "comboboxtext_device_select"));
+							  "comboboxtext_device_select"));
 	gtk_combo_box_text_remove(GTK_COMBO_BOX_TEXT(device_select), 0);
 
 	jesd_core_selection = GTK_WIDGET(gtk_builder_get_object(builder,
-	                                 "jesd_core_selection"));
+								"jesd_core_selection"));
 	gtk_combo_box_text_remove(GTK_COMBO_BOX_TEXT(jesd_core_selection), 0);
 
 	lane_status = GTK_WIDGET(gtk_builder_get_object(builder, "lane_status"));
@@ -1408,7 +1408,7 @@ int main(int argc, char *argv[])
 	gtk_builder_connect_signals(builder, NULL);
 
 	g_signal_connect(G_OBJECT(main_window), "destroy",
-	                 G_CALLBACK(gtk_main_quit), NULL);
+			 G_CALLBACK(gtk_main_quit), NULL);
 
 	if (!get_devices(basedir, XCVR_DRIVER_NAME, "eyescan_info", device_select)) {
 		get_devices(basedir, XCVR_NEW_DRIVER_NAME, "eyescan_info", device_select);

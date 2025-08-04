@@ -237,7 +237,7 @@ int update_lane_status(WINDOW *win, int x, struct jesd204b_laneinfo *info,
 			octets_per_multifame = lane->k * lane->f;
 
 			latency = octets_per_multifame * lane->lane_latency_multiframes +
-				lane->lane_latency_octets;
+				  lane->lane_latency_octets;
 
 			if ((latency - latency_min) >= octets_per_multifame)
 				c = C_ERR;
@@ -304,7 +304,7 @@ int jesd_update_status(WINDOW *win, int x, const char *device)
 	struct jesd204b_jesd204_status info;
 	float measured, reported, div40;
 	enum color_pairs c_measured_link_clock, c_lane_rate_div,
-		c_measured_device_clock, c_reported_device_clock;
+	     c_measured_device_clock, c_reported_device_clock;
 	int y = 1, pos = 0;
 
 	read_jesd204_status(get_full_device_path(basedir, device), &info);
@@ -331,13 +331,13 @@ int jesd_update_status(WINDOW *win, int x, const char *device)
 		sscanf((char *)&info.desired_device_clock, "%f", &div40);
 
 		if (measured > (reported * (1 + PPM(CLOCK_ACCURACY))) ||
-		measured < (reported * (1 - PPM(CLOCK_ACCURACY))))
+		    measured < (reported * (1 - PPM(CLOCK_ACCURACY))))
 			c_measured_device_clock = C_ERR;
 		else
 			c_measured_device_clock = C_GOOD;
 
 		if (reported > (div40 * (1 + PPM(CLOCK_ACCURACY))) ||
-		reported < (div40 * (1 - PPM(CLOCK_ACCURACY))))
+		    reported < (div40 * (1 - PPM(CLOCK_ACCURACY))))
 			c_reported_device_clock = C_ERR;
 		else
 			c_reported_device_clock = C_GOOD;
@@ -408,7 +408,7 @@ static void jesd_redo_r_box(WINDOW *win, const int simple)
 {
 	int x, y;
 
-	if(simple)
+	if (simple)
 		return;
 
 	getmaxyx(win, y, x);
