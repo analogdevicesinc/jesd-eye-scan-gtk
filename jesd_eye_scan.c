@@ -68,6 +68,15 @@
 
 #include "jesd_common.h"
 
+/* Wrapper to suppress deprecation warnings for color setting */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+static void set_widget_color(GtkWidget *widget, GdkRGBA *color)
+{
+	gtk_widget_override_color(widget, GTK_STATE_FLAG_NORMAL, color);
+}
+#pragma GCC diagnostic pop
+
 char basedir[PATH_MAX];
 unsigned remote = 0;
 guint timer;
@@ -974,7 +983,7 @@ GtkWidget *set_lable_text(GtkWidget *label, const char *text,
 	}
 
 	if (expected != NULL) {
-		gtk_widget_override_color(label, GTK_STATE_FLAG_NORMAL, &color);
+		set_widget_color(label, &color);
 	}
 
 	return label;
@@ -1093,7 +1102,7 @@ GtkWidget *set_per_lane_status(struct jesd204b_laneinfo *info, unsigned lanes, i
 				g_snprintf(text, sizeof(text), "%d / %d", lane->lane_latency_multiframes,
 					   lane->lane_latency_octets);
 				label = set_lable_text(NULL, text, NULL, 0);
-				gtk_widget_override_color(label, GTK_STATE_FLAG_NORMAL, &color);
+				set_widget_color(label, &color);
 				gtk_grid_attach(GTK_GRID(grid), label, i, j++, 1, 1);
 
 				/* CGS State */
@@ -1123,7 +1132,7 @@ GtkWidget *set_per_lane_status(struct jesd204b_laneinfo *info, unsigned lanes, i
 					g_snprintf(text, sizeof(text), "%d", lane->lane_latency_octets);
 				}
 				label = set_lable_text(NULL, text, NULL, 0);
-				gtk_widget_override_color(label, GTK_STATE_FLAG_NORMAL, &color);
+				set_widget_color(label, &color);
 				gtk_grid_attach(GTK_GRID(grid), label, i, j++, 1, 1);
 				/* Extended multiblock alignment */
 				label = set_lable_text(NULL, lane->ext_multiblock_align_state, "EMB_LOCK", 0);
@@ -1185,7 +1194,7 @@ int jesd_update_status(const char *path)
 		color = color_green;
 	}
 
-	gtk_widget_override_color(measured_link_clock, GTK_STATE_FLAG_NORMAL, &color);
+	set_widget_color(measured_link_clock, &color);
 
 	if (reported > (div40 * (1 + PPM(CLOCK_ACCURACY))) ||
 	    reported < (div40 * (1 - PPM(CLOCK_ACCURACY)))) {
@@ -1194,7 +1203,7 @@ int jesd_update_status(const char *path)
 		color = color_green;
 	}
 
-	gtk_widget_override_color(lane_rate_div, GTK_STATE_FLAG_NORMAL, &color);
+	set_widget_color(lane_rate_div, &color);
 
 	/* Device clock validation - similar to jesd_status.c */
 	if (info.measured_device_clock[0] != 'N') {
@@ -1212,7 +1221,7 @@ int jesd_update_status(const char *path)
 		} else {
 			color = color_green;
 		}
-		gtk_widget_override_color(measured_device_clock, GTK_STATE_FLAG_NORMAL, &color);
+		set_widget_color(measured_device_clock, &color);
 
 		if (reported_dev > (desired_dev * (1 + PPM(CLOCK_ACCURACY))) ||
 		    reported_dev < (desired_dev * (1 - PPM(CLOCK_ACCURACY)))) {
@@ -1220,7 +1229,7 @@ int jesd_update_status(const char *path)
 		} else {
 			color = color_green;
 		}
-		gtk_widget_override_color(reported_device_clock, GTK_STATE_FLAG_NORMAL, &color);
+		set_widget_color(reported_device_clock, &color);
 	}
 
 	return encoder;
@@ -1241,7 +1250,7 @@ static int update_status(GtkComboBoxText *combo_box, int *encoder)
 	path = get_full_device_path(basedir, item);
 	if (!path) {
 		g_free(item);
-		return;
+		return 0;
 	}
 	*encoder = jesd_update_status(path);
 	cnt = read_all_laneinfo(path, lane_info);
@@ -1266,7 +1275,7 @@ static gboolean update_page(void)
 
 void jesd_core_selection_cb(GtkComboBoxText *combo_box, gpointer user_data)
 {
-	int encoder, cnt;
+	int encoder = JESD204_ENCODER_8B10B, cnt;
 
 	cnt = update_status(combo_box, &encoder);
 	create_and_fill_model(cnt, encoder);

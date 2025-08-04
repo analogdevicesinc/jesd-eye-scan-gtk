@@ -309,7 +309,7 @@ int jesd_update_status(WINDOW *win, int x, const char *device)
 
 	char *path = get_full_device_path(basedir, device);
 	if (!path)
-		return;
+		return -1;
 	read_jesd204_status(path, &info);
 	free(path);
 

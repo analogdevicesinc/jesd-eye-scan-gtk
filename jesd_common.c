@@ -76,13 +76,20 @@ int jesd_find_devices(const char *basedir, const char *driver, const char *file_
 	}
 
 	while ((de = readdir(dr)) != NULL) {
-		snprintf(stat_path, sizeof(stat_path), "%s/%s", path, de->d_name);
+		int ret_snprintf;
+		
+		ret_snprintf = snprintf(stat_path, sizeof(stat_path), "%s/%s", path, de->d_name);
+		if (ret_snprintf >= (int)sizeof(stat_path))
+			continue; /* Path too long, skip */
 
 		if (lstat(stat_path, &sfile) == -1)
 			continue;
 
 		if (file_exists && S_ISLNK(sfile.st_mode)) {
-			snprintf(stat_path, sizeof(stat_path), "%s/%s/%s", path, de->d_name, file_exists);
+			ret_snprintf = snprintf(stat_path, sizeof(stat_path), "%s/%s/%s", path, de->d_name, file_exists);
+			if (ret_snprintf >= (int)sizeof(stat_path))
+				continue; /* Path too long, skip */
+			
 			if (stat(stat_path, &efile) == 0)
 				use = 1;
 			else
@@ -172,10 +179,11 @@ int read_laneinfo(const char *basedir, unsigned lane,
 
 		ret += fscanf(pFile, "State of Extended multiblock alignment:%s\n",
 			      (char *)&info->ext_multiblock_align_state);
-		/* Ignore return value since optional */
-		fscanf(pFile, "Lane Latency: %u (min/max %u/%u)\n",
+		/* Optional field - ignore if not present */
+		int latency_ret = fscanf(pFile, "Lane Latency: %u (min/max %u/%u)\n",
 		       &info->lane_latency_octets,
 		       &info->lane_latency_min, &info->lane_latency_max);
+		(void)latency_ret; /* Suppress unused variable warning */
 
 		goto close_f;
 	};
