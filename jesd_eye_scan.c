@@ -105,6 +105,9 @@ GtkWidget *link_status;
 GtkWidget *sysref_captured;
 GtkWidget *sysref_alignment_error;
 GtkWidget *external_reset;
+GtkWidget *measured_device_clock;
+GtkWidget *reported_device_clock;
+GtkWidget *desired_device_clock;
 
 GdkRGBA color_red;
 GdkRGBA color_green;
@@ -1159,6 +1162,11 @@ int jesd_update_status(const char *path)
 	set_lable_text(sysref_alignment_error, (char *)&info.sysref_alignment_error,
 	               "Yes", 1);
 
+	/* Device clock fields */
+	set_lable_text(measured_device_clock, (char *)&info.measured_device_clock, NULL, 0);
+	set_lable_text(reported_device_clock, (char *)&info.reported_device_clock, NULL, 0);
+	set_lable_text(desired_device_clock, (char *)&info.desired_device_clock, NULL, 0);
+
 	sscanf((char *)&info.measured_link_clock, "%f", &measured);
 	sscanf((char *)&info.reported_link_clock, "%f", &reported);
 	sscanf((char *)&info.lane_rate_div, "%f", &div40);
@@ -1180,6 +1188,30 @@ int jesd_update_status(const char *path)
 	}
 
 	gtk_widget_override_color(lane_rate_div, GTK_STATE_FLAG_NORMAL, &color);
+
+	/* Device clock validation - similar to jesd_status.c */
+	if (info.measured_device_clock[0] != 'N') {
+		float measured_dev, reported_dev, desired_dev;
+		sscanf((char *)&info.measured_device_clock, "%f", &measured_dev);
+		sscanf((char *)&info.reported_device_clock, "%f", &reported_dev);
+		sscanf((char *)&info.desired_device_clock, "%f", &desired_dev);
+
+		if (measured_dev > (reported_dev * (1 + PPM(CLOCK_ACCURACY))) ||
+		    measured_dev < (reported_dev * (1 - PPM(CLOCK_ACCURACY)))) {
+			color = color_red;
+		} else {
+			color = color_green;
+		}
+		gtk_widget_override_color(measured_device_clock, GTK_STATE_FLAG_NORMAL, &color);
+
+		if (reported_dev > (desired_dev * (1 + PPM(CLOCK_ACCURACY))) ||
+		    reported_dev < (desired_dev * (1 - PPM(CLOCK_ACCURACY)))) {
+			color = color_red;
+		} else {
+			color = color_green;
+		}
+		gtk_widget_override_color(reported_device_clock, GTK_STATE_FLAG_NORMAL, &color);
+	}
 
 	return encoder;
 }
@@ -1316,6 +1348,12 @@ int main(int argc, char *argv[])
 	                             "sysref_captured"));
 	sysref_alignment_error = GTK_WIDGET(gtk_builder_get_object(builder,
 	                                    "sysref_alignment_error"));
+	measured_device_clock = GTK_WIDGET(gtk_builder_get_object(builder,
+	                                  "measured_device_clock"));
+	reported_device_clock = GTK_WIDGET(gtk_builder_get_object(builder,
+	                                  "reported_device_clock"));
+	desired_device_clock = GTK_WIDGET(gtk_builder_get_object(builder,
+	                                 "desired_device_clock"));
 
 	tview = GTK_WIDGET(gtk_builder_get_object(builder, "textview1"));
 

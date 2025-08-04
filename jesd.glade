@@ -316,6 +316,87 @@
                                   </packing>
                                 </child>
                                 <child>
+                                  <object class="GtkLabel" id="label_device_clock_0">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">False</property>
+                                    <property name="xpad">5</property>
+                                    <property name="ypad">2</property>
+                                    <property name="label" translatable="yes">Measured Device Clock</property>
+                                    <property name="xalign">0</property>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">0</property>
+                                    <property name="top_attach">10</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="measured_device_clock">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">False</property>
+                                    <property name="xpad">5</property>
+                                    <property name="ypad">2</property>
+                                    <property name="xalign">0</property>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">1</property>
+                                    <property name="top_attach">10</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="label_device_clock_1">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">False</property>
+                                    <property name="xpad">5</property>
+                                    <property name="ypad">2</property>
+                                    <property name="label" translatable="yes">Reported Device Clock</property>
+                                    <property name="xalign">0</property>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">0</property>
+                                    <property name="top_attach">11</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="reported_device_clock">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">False</property>
+                                    <property name="xpad">5</property>
+                                    <property name="ypad">2</property>
+                                    <property name="xalign">0</property>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">1</property>
+                                    <property name="top_attach">11</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="label_device_clock_2">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">False</property>
+                                    <property name="xpad">5</property>
+                                    <property name="ypad">2</property>
+                                    <property name="label" translatable="yes">Desired Device Clock</property>
+                                    <property name="xalign">0</property>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">0</property>
+                                    <property name="top_attach">12</property>
+                                  </packing>
+                                </child>
+                                <child>
+                                  <object class="GtkLabel" id="desired_device_clock">
+                                    <property name="visible">True</property>
+                                    <property name="can_focus">False</property>
+                                    <property name="xpad">5</property>
+                                    <property name="ypad">2</property>
+                                    <property name="xalign">0</property>
+                                  </object>
+                                  <packing>
+                                    <property name="left_attach">1</property>
+                                    <property name="top_attach">12</property>
+                                  </packing>
+                                </child>
+                                <child>
                                   <object class="GtkLabel" id="label_jesd_status_c9">
                                     <property name="visible">True</property>
                                     <property name="can_focus">False</property>
