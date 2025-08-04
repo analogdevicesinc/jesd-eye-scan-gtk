@@ -107,23 +107,29 @@ int read_encoding(const char *basedir)
 
 	memset(encoder, 0, sizeof(encoder));
 
-	sprintf(temp, "%s/encoder", basedir);
+	snprintf(temp, sizeof(temp), "%s/encoder", basedir);
 	f = fopen(temp, "r");
 	/*
 	 * If the file is not there, default to 8b10b. It might be an older
 	 * kernel and, most likely, only supports jesd204b
 	 */
 	if (!f && errno == ENOENT)
-	        return JESD204_ENCODER_8B10B;
+		return JESD204_ENCODER_8B10B;
 	else if (!f)
 		return -errno;
 
-	fread(encoder, sizeof(encoder), 1, f);
+	ret = fread(encoder, sizeof(encoder), 1, f);
+	if (ret != 1) {
+		if (!feof(f)) {
+			fclose(f);
+			return JESD204_ENCODER_8B10B; /* Default to 8b10b on read error */
+		}
+	}
 
 	if (!strcmp(encoder, "8b10b"))
-	        ret = JESD204_ENCODER_8B10B;
+		ret = JESD204_ENCODER_8B10B;
 	else
-	        ret = JESD204_ENCODER_64B66B;
+		ret = JESD204_ENCODER_64B66B;
 
 	fclose(f);
 
@@ -143,7 +149,7 @@ int read_laneinfo(const char *basedir, unsigned lane,
 
 	memset(info, 0, sizeof(*info));
 
-	sprintf(temp, "%s/lane%d_info", basedir, lane);
+	snprintf(temp, sizeof(temp), "%s/lane%d_info", basedir, lane);
 
 	pFile = fopen(temp, "r");
 
@@ -152,8 +158,15 @@ int read_laneinfo(const char *basedir, unsigned lane,
 
 	ret = fscanf(pFile, "Errors: %u\n", &info->lane_errors);
 	if (encoder == JESD204_ENCODER_64B66B) {
-		ret += fscanf(pFile, "State of Extended multiblock alignment:%s\n",
-			      (char *)&info->ext_multiblock_align_state);
+
+
+	ret += fscanf(pFile, "State of Extended multiblock alignment:%s\n",
+			(char *)&info->ext_multiblock_align_state);
+	/* Ignore return value since optional */
+	fscanf(pFile, "Lane Latency: %u (min/max %u/%u)n",
+		      &info->lane_latency_octets,
+		      &info->lane_latency_min, &info->lane_latency_max);
+
 		goto close_f;
 	};
 	ret += fscanf(pFile, "CGS state: %s\n", (char *)&info->cgs_state);
@@ -251,7 +264,7 @@ int read_jesd204_status(const char *basedir,
 	if (encoder < 0)
 		return encoder;
 
-	sprintf(temp, "%s/status", basedir);
+	snprintf(temp, sizeof(temp), "%s/status", basedir);
 
 	memset(info, 0, sizeof(*info));
 

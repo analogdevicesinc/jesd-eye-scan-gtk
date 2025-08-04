@@ -53,8 +53,14 @@
 #define CLOCK_ACCURACY		200
 
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+
+/* Use GLib's MAX/MIN macros if available, otherwise define our own */
+#ifndef MAX
 #define MAX(a,b) (((a)>(b))?(a):(b))
+#endif
+#ifndef MIN
 #define MIN(a,b) (((a)<(b))?(a):(b))
+#endif
 
 #define JESD204_ENCODER_8B10B   0
 #define JESD204_ENCODER_64B66B  1
@@ -91,6 +97,8 @@ struct jesd204b_laneinfo {
 	unsigned lane_errors;
 	unsigned lane_latency_multiframes;
 	unsigned lane_latency_octets;
+	unsigned lane_latency_min; /* 204C modes only */
+	unsigned lane_latency_max; /* 204C modes only */
 
 	char cgs_state[MAX_SYSFS_STRING_SIZE];
 	char init_frame_sync[MAX_SYSFS_STRING_SIZE];

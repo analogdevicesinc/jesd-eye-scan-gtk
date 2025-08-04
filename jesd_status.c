@@ -3,7 +3,7 @@
 *   @brief  JESD204 Status Information Utility
 *   @author Michael Hennerich (michael.hennerich@analog.com)
 ********************************************************************************
-* Copyright 2019 (c) Analog Devices, Inc.
+* Copyright 2019-2025 (c) Analog Devices, Inc.
 *
 * All rights reserved.
 *
@@ -112,6 +112,7 @@ static const char *lane_status_labels[] = {
 static const char *lane_status_labels_64b66b[] = {
 	"Lane#",
 	"Errors",
+	"Latency (Octets)",
 	"Extended multiblock alignment",
 	NULL
 };
@@ -143,6 +144,7 @@ int jesd_get_strlen(WINDOW *win, int x)
 	int x1, y1;
 
 	getyx(win, y1, x1);
+	(void)y1;  /* Suppress unused variable warning */
 
 	return x1 - x;
 }
@@ -202,9 +204,10 @@ int update_lane_status(WINDOW *win, int x, struct jesd204b_laneinfo *info,
 		       unsigned lanes)
 {
 	struct jesd204b_laneinfo *lane;
-	enum color_pairs c;
+	enum color_pairs c = C_ERR;
 	int octets_per_multifame, latency_min, latency, i, y, pos = 0;
 	struct jesd204b_laneinfo *tmp = info;
+	bool not_available = false;
 
 	if (!lanes)
 		return 0;
@@ -222,17 +225,27 @@ int update_lane_status(WINDOW *win, int x, struct jesd204b_laneinfo *info,
 		y = 1;
 
 		lane = info++;
-		octets_per_multifame = lane->k * lane->f;
 
-		latency = octets_per_multifame * lane->lane_latency_multiframes +
-			  lane->lane_latency_octets;
+		if (encoder == JESD204_ENCODER_64B66B) {
+			if (lane->lane_latency_octets == 0 && lane->lane_latency_min == 0 && lane->lane_latency_max == 0) {
+				c = C_GOOD;
+				not_available = true;
+			} else if (lane->lane_latency_octets < lane->lane_latency_min || lane->lane_latency_octets > lane->lane_latency_max) {
+				c = C_ERR;
+			}
+		} else {
+			octets_per_multifame = lane->k * lane->f;
 
-		if ((latency - latency_min) >= octets_per_multifame)
-			c = C_ERR;
-		else if ((latency - latency_min) > (octets_per_multifame / 2))
-			c = C_CRIT;
-		else
-			c = C_GOOD;
+			latency = octets_per_multifame * lane->lane_latency_multiframes +
+				lane->lane_latency_octets;
+
+			if ((latency - latency_min) >= octets_per_multifame)
+				c = C_ERR;
+			else if ((latency - latency_min) > (octets_per_multifame / 2))
+				c = C_CRIT;
+			else
+				c = C_GOOD;
+		}
 
 		wcolor_set(win, C_NORM, NULL);
 
@@ -251,6 +264,15 @@ int update_lane_status(WINDOW *win, int x, struct jesd204b_laneinfo *info,
 		pos = jesd_maxx(pos, jesd_get_strlen(win, x));
 
 		if (encoder == JESD204_ENCODER_64B66B) {
+			wcolor_set(win, c, NULL);
+			jesd_clear_line_from(win, y, x);
+			if (not_available) {
+				mvwprintw(win, y++, x, "N/A");
+			} else {
+				mvwprintw(win, y++, x, "%u", lane->lane_latency_octets);
+			}
+			pos = jesd_maxx(pos, jesd_get_strlen(win, x));
+
 			pos = jesd_maxx(pos, jesd_print_win_exp(win, y++, x,
 								lane->ext_multiblock_align_state,
 								"EMB_LOCK", 0, true));

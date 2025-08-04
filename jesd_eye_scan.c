@@ -3,7 +3,7 @@
  *   @brief  JESD204 Eye Scan Visualization Utility
  *   @author Michael Hennerich (michael.hennerich@analog.com)
 ********************************************************************************
- * Copyright 2014-2018 (c) Analog Devices, Inc.
+ * Copyright 2014-2025 (c) Analog Devices, Inc.
  *
  * All rights reserved.
  *
@@ -56,11 +56,12 @@
 #include <sys/dir.h>
 #include <syslog.h>
 #include <math.h>
-#include <math.h>
 #include <time.h>
 #include <pthread.h>
 #include <ctype.h>
 #include <locale.h>
+#include <limits.h>
+#include <stddef.h>
 
 #include <gtk/gtk.h>
 #include <gtk/gtkx.h>
@@ -105,9 +106,9 @@ GtkWidget *sysref_captured;
 GtkWidget *sysref_alignment_error;
 GtkWidget *external_reset;
 
-GdkColor color_red;
-GdkColor color_green;
-GdkColor color_orange;
+GdkRGBA color_red;
+GdkRGBA color_green;
+GdkRGBA color_orange;
 
 pthread_t work;
 GMutex *mutex;
@@ -126,6 +127,10 @@ char jesd_devices[MAX_DEVICES][PATH_MAX];
 
 unsigned long long get_lane_rate(unsigned lane)
 {
+	if (lane >= MAX_LANES) {
+		fprintf(stderr, "Error: lane %u exceeds MAX_LANES (%d)\n", lane, MAX_LANES);
+		return 0;
+	}
 	return lane_info[lane].fc * 1000ULL;
 }
 
@@ -141,14 +146,14 @@ void text_view_delete(void)
 
 #define JESD204_TREE_STORE_NEW_ROW_VAL(name, value)\
 {\
-	sprintf(temp, "%d", value);\
+	snprintf(temp, sizeof(temp), "%d", value);\
 	gtk_tree_store_append(treestore, &child, &toplevel);\
 	gtk_tree_store_set(treestore, &child, COLUMN,  name, COLUMN2, temp, -1);\
 }\
 
 #define JESD204_TREE_STORE_NEW_ROW_VALF(name, value)\
 {\
-	sprintf(temp, "%.3f", value);\
+	snprintf(temp, sizeof(temp), "%.3f", value);\
 	gtk_tree_store_append(treestore, &child, &toplevel);\
 	gtk_tree_store_set(treestore, &child, COLUMN,  name, COLUMN2, temp, -1);\
 }\
@@ -159,17 +164,20 @@ void text_view_delete(void)
 	gtk_tree_store_set(treestore, &child, COLUMN,  name, COLUMN2, value, -1);\
 }\
 
-static int create_and_fill_model(unsigned active_lanes)
+static int create_and_fill_model(unsigned active_lanes, int encoder)
 {
 	GtkTreeStore *treestore;
 	GtkTreeIter toplevel, child;
 	char temp[256];
 	unsigned lane = 0;
 
+	if (encoder != JESD204_ENCODER_8B10B)
+		return 0;
+
 	treestore = gtk_tree_store_new(NUM_COLS, G_TYPE_STRING, G_TYPE_STRING);
 
-	for (lane = 0; lane < active_lanes; lane++) {
-		sprintf(temp, "Lane %d", lane);
+	for (lane = 0; lane < active_lanes && lane < MAX_LANES; lane++) {
+		snprintf(temp, sizeof(temp), "Lane %d", lane);
 		gtk_tree_store_append(treestore, &toplevel, NULL);
 		gtk_tree_store_set(treestore, &toplevel, COLUMN, temp, -1);
 
@@ -283,7 +291,7 @@ int print_output_sys(void *err, const char *str, ...)
 
 	bzero(buf, 250);
 	va_start(args, str);
-	len = vsprintf(buf, str, args);
+	len = vsnprintf(buf, sizeof(buf), str, args);
 	va_end(args);
 
 	if (err == stderr) {
@@ -412,13 +420,27 @@ int plot(struct jesd204b_xcvr_eyescan_info *info, char *file, unsigned lane,
 		return -1;
 	}
 
+	/* Check for integer overflow */
+	if (info->es_hsize > 0 && info->es_vsize > UINT_MAX / info->es_hsize) {
+		print_output_sys(stderr, "Error: eye scan dimensions too large\n");
+		return -1;
+	}
+
 	cnt = info->es_hsize * info->es_vsize;	/* X,Y */
 
-	buf = malloc(cnt * (info->lpm ? 4 : 8));
+	/* Check for malloc size overflow */
+	size_t elem_size = info->lpm ? 4 : 8;
+	if (cnt > 0 && elem_size > SIZE_MAX / cnt) {
+		print_output_sys(stderr, "Error: allocation size too large\n");
+		return -1;
+	}
+
+	buf = malloc(cnt * elem_size);
 	buf_lpm = (unsigned *) buf;
 
 	if (buf == NULL) {
-		exit(EXIT_FAILURE);
+		print_output_sys(stderr, "Error: Failed to allocate memory\n");
+		return -ENOMEM;
 	}
 
 	if (file_png == NULL) {
@@ -441,7 +463,7 @@ int plot(struct jesd204b_xcvr_eyescan_info *info, char *file, unsigned lane,
 	fprintf(gp, "set xlabel 'Horizontal Offset (UI)'\n");
 	fprintf(gp, "set palette rgbformulae 7,5,15\n");
 	fprintf(gp, "set title '"
-	        "JESD204B Lane%i @ %.2f Gbps %s (Max BER %.1e)'\n",
+	        "JESD204 Lane%i @ %.2f Gbps %s (Max BER %.1e)'\n",
 	        lane, (double)info->lane_rate / 1000000, info->lpm ? "LPM" : "DFE",
 	        calc_ber(info, 0xFFFF0000FFFF0000, p));
 
@@ -505,7 +527,7 @@ int write_sysfs(char *filename, char *basedir, char *val)
 	char temp[PATH_MAX];
 	int ret = 0;
 
-	sprintf(temp, "%s/%s", basedir, filename);
+	snprintf(temp, sizeof(temp), "%s/%s", basedir, filename);
 	sysfsfp = fopen(temp, "w");
 
 	if (sysfsfp == NULL) {
@@ -525,15 +547,26 @@ int get_eye_data(struct jesd204b_xcvr_eyescan_info *info, char *filename,
 	char temp[PATH_MAX];
 	unsigned long long *buf;
 	int ret = 0;
+	/* Check for integer overflow */
+	if (info->es_hsize > 0 && info->es_vsize > UINT_MAX / info->es_hsize) {
+		return -EINVAL;
+	}
+
 	unsigned cnt = info->es_hsize * info->es_vsize;	/* X,Y */
 
-	buf = malloc(cnt * (info->lpm ? 4 : 8));
+	/* Check for malloc size overflow */
+	size_t elem_size = info->lpm ? 4 : 8;
+	if (cnt > 0 && elem_size > SIZE_MAX / cnt) {
+		return -EINVAL;
+	}
+
+	buf = malloc(cnt * elem_size);
 
 	if (buf == NULL) {
 		return -ENOMEM;
 	}
 
-	sprintf(temp, "%s/%s", basedir, filename);
+	snprintf(temp, sizeof(temp), "%s/%s", basedir, filename);
 	sysfsfp = fopen(temp, "r");
 
 	if (sysfsfp == NULL) {
@@ -580,24 +613,24 @@ int get_eye(struct jesd204b_xcvr_eyescan_info *info, unsigned lane,
 		return 0;
 	}
 
-	sprintf(temp, "%d", prescale);
+	snprintf(temp, sizeof(temp), "%d", prescale);
 
 	write_sysfs(JESD204B_PRESCALE, info->gt_interface_path, temp);
 
-	sprintf(temp, "%d", lane);
+	snprintf(temp, sizeof(temp), "%d", lane);
 	write_sysfs(JESD204B_LANE_ENABLE, info->gt_interface_path, temp);
 
-	sprintf(temp, "lane%d_p%d.eye", lane, prescale);
+	snprintf(temp, sizeof(temp), "lane%d_p%d.eye", lane, prescale);
 	ret = get_eye_data(info, JESD204B_EYE_DATA, info->gt_interface_path, temp);
 
 	if (ret) {
 		return ret;
 	}
 
-	sprintf(temp, "Lane %d : %.2e",
+	snprintf(temp, sizeof(temp), "Lane %d : %.2e",
 	        lane, calc_ber(info, 0xFFFF0000FFFF0000, prescale));
 
-	gdk_threads_enter();
+	/* gdk_threads_enter() is deprecated */
 	gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(finished_eyes),
 	                               (const gchar *)temp);
 
@@ -606,7 +639,7 @@ int get_eye(struct jesd204b_xcvr_eyescan_info *info, unsigned lane,
 		is_first++;
 	}
 
-	gdk_threads_leave();
+	/* gdk_threads_leave() is deprecated */
 
 	return 0;
 }
@@ -618,7 +651,7 @@ int read_eyescan_info(const char *basedir,
 	char temp[PATH_MAX];
 	int ret;
 
-	sprintf(temp, "%s/eyescan_info", basedir);
+	snprintf(temp, sizeof(temp), "%s/eyescan_info", basedir);
 	pFile = fopen(temp, "r");
 
 	if (pFile == NULL) {
@@ -649,8 +682,8 @@ void *worker(void *args)
 	struct jesd204b_xcvr_eyescan_info *info = args;
 	unsigned lane_en = 0, p = 0, pmin, pmax, l, i = 0;
 
-	/* get GTK thread lock */
-	gdk_threads_enter();
+	/* GTK3 no longer requires explicit thread locking */
+	/* gdk_threads_enter() is deprecated */
 
 	for (l = 0; l < MAX_LANES; l++) {
 		lane_en |= gtk_toggle_button_get_active(GTK_TOGGLE_BUTTON(lane[l])) << l;
@@ -659,7 +692,7 @@ void *worker(void *args)
 	pmin = gtk_combo_box_get_active(GTK_COMBO_BOX(min_ber));
 	pmax = gtk_combo_box_get_active(GTK_COMBO_BOX(max_ber));
 
-	gdk_threads_leave();
+	/* gdk_threads_leave() is deprecated */
 
 	if (pmin > pmax) {
 		p = pmin;
@@ -688,10 +721,11 @@ void save_plot_pressed_cb(GtkButton *button, gpointer user_data)
 {
 	GtkWidget *dialog;
 	char temp[PATH_MAX];
-	unsigned lane, prescale;
+	unsigned lane, prescale = 0;  /* Initialize to avoid undefined behavior */
 	gchar *item;
 	double tmp, tmp2, places;
 	unsigned int i;
+	int found = 0;
 
 	struct jesd204b_xcvr_eyescan_info *info = &eyescan_info;
 
@@ -701,7 +735,17 @@ void save_plot_pressed_cb(GtkButton *button, gpointer user_data)
 		return;
 	}
 
-	sscanf(item, "Lane %d : %lf", &lane, &tmp);
+	if (sscanf(item, "Lane %d : %lf", &lane, &tmp) != 2) {
+		print_output_sys(stderr, "Error: Invalid item format\n");
+		g_free(item);
+		return;
+	}
+
+	if (lane >= MAX_LANES) {
+		print_output_sys(stderr, "Error: lane %u exceeds MAX_LANES (%d)\n", lane, MAX_LANES);
+		g_free(item);
+		return;
+	}
 
 	for (i = 0; i <= MAX_PRESCALE; i++) {
 		tmp2 = calc_ber(info, 0xFFFF0000FFFF0000, i);
@@ -710,19 +754,30 @@ void save_plot_pressed_cb(GtkButton *button, gpointer user_data)
 
 		if (tmp2 == tmp) {
 			prescale = i;
+			found = 1;
 			break;
 		}
 	}
 
-	sprintf(item, "lane%d_p%d.eye", lane, prescale);
-	sprintf(temp, "lane%d_%.2eBERT.png", lane, tmp);
+	if (!found) {
+		print_output_sys(stderr, "Error: Could not find matching prescale value\n");
+		g_free(item);
+		return;
+	}
+
+	/* Create a new buffer for the file name since we can't modify 'item' */
+	char eye_filename[PATH_MAX];
+	snprintf(eye_filename, sizeof(eye_filename), "lane%d_p%d.eye", lane, prescale);
+	snprintf(temp, sizeof(temp), "lane%d_%.2eBERT.png", lane, tmp);
+
+	g_free(item);  /* Free the GTK allocated string */
 
 	dialog = gtk_file_chooser_dialog_new("Save File",
 	                                     NULL,
 	                                     GTK_FILE_CHOOSER_ACTION_SAVE,
-	                                     GTK_STOCK_CANCEL,
+	                                     "_Cancel",
 	                                     GTK_RESPONSE_CANCEL,
-	                                     GTK_STOCK_SAVE,
+	                                     "_Save",
 	                                     GTK_RESPONSE_ACCEPT, NULL);
 	gtk_file_chooser_set_do_overwrite_confirmation(GTK_FILE_CHOOSER(dialog),
 	                TRUE);
@@ -735,12 +790,11 @@ void save_plot_pressed_cb(GtkButton *button, gpointer user_data)
 
 		filename =
 		        gtk_file_chooser_get_filename(GTK_FILE_CHOOSER(dialog));
-		plot(info, item, lane, prescale, filename);
+		plot(info, eye_filename, lane, prescale, filename);
 		g_free(filename);
 
 	}
 
-	free(item);
 	gtk_widget_destroy(dialog);
 }
 
@@ -762,7 +816,17 @@ void show_pressed_cb(GtkButton *button, gpointer user_data)
 
 	text_view_delete();
 
-	sscanf(item, "Lane %d : %lf", &lane, &tmp);
+	if (sscanf(item, "Lane %d : %lf", &lane, &tmp) != 2) {
+		print_output_sys(stderr, "Error: Invalid item format\n");
+		g_free(item);
+		return;
+	}
+
+	if (lane >= MAX_LANES) {
+		print_output_sys(stderr, "Error: lane %u exceeds MAX_LANES (%d)\n", lane, MAX_LANES);
+		g_free(item);
+		return;
+	}
 
 	for (i = 0; i <= MAX_PRESCALE; i++) {
 		tmp2 = calc_ber(info, 0xFFFF0000FFFF0000, i);
@@ -775,15 +839,17 @@ void show_pressed_cb(GtkButton *button, gpointer user_data)
 		}
 	}
 
-	sprintf(item, "lane%d_p%d.eye", lane, prescale);
+	/* Create a new buffer for the file name since we can't modify 'item' */
+	char eye_filename[PATH_MAX];
+	snprintf(eye_filename, sizeof(eye_filename), "lane%d_p%d.eye", lane, prescale);
 
 	print_output_sys(stdout, "LANE%d P(%d) @ %.2f Gbps\n", lane, prescale,
 	                 (double)info->lane_rate / 1000000);
 	print_output_sys(stdout, "Eye Center:\n  ERR: 0 BER: %.3e\n",
 	                 calc_ber(info, 0xFFFF0000FFFF0000, prescale));
 
-	plot(info, item, lane, prescale, NULL);
-	free(item);
+	plot(info, eye_filename, lane, prescale, NULL);
+	g_free(item);  /* Use g_free for GTK allocated memory */
 }
 
 void start_pressed_cb(GtkButton *button, gpointer user_data)
@@ -857,7 +923,7 @@ void device_select_pressed_cb(GtkComboBoxText *combo_box, gpointer user_data)
 
 	/* Populate min/max BER combo boxes */
 	for (i = 0; i <= MAX_PRESCALE; i++) {
-		sprintf(temp, "%.2e",
+		snprintf(temp, sizeof(temp), "%.2e",
 		        calc_ber(info, 0xFFFF0000FFFF0000, i));
 		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(min_ber),
 		                               (const gchar *)temp);
@@ -886,7 +952,7 @@ void device_select_pressed_cb(GtkComboBoxText *combo_box, gpointer user_data)
 GtkWidget *set_lable_text(GtkWidget *label, const char *text,
                           const char *expected, unsigned invert)
 {
-	GdkColor color;
+	GdkRGBA color;
 
 	if (g_strcmp0(text, expected)) {
 		color = (invert ? color_green : color_red);
@@ -901,7 +967,7 @@ GtkWidget *set_lable_text(GtkWidget *label, const char *text,
 	}
 
 	if (expected != NULL) {
-		gtk_widget_modify_fg(label, GTK_STATE_NORMAL, &color);
+		gtk_widget_override_color(label, GTK_STATE_FLAG_NORMAL, &color);
 	}
 
 	return label;
@@ -916,18 +982,22 @@ void my_gtk_label_set_xalign(GtkLabel *label, float xalign)
 	g_value_unset(&val);
 }
 
-GtkWidget *set_per_lane_status(struct jesd204b_laneinfo *info, unsigned lanes)
+GtkWidget *set_per_lane_status(struct jesd204b_laneinfo *info, unsigned lanes, int encoder, const char *device_path)
 {
 	struct jesd204b_laneinfo *lane;
-	GdkColor color;
+	GdkRGBA color;
 
 	GtkWidget *label;
 	char text[128];
 	int i, j;
 	int latency_min, latency, octets_per_multifame;
 	struct jesd204b_laneinfo *tmp = info;
+	int num_columns;
+	const char **tab_labels;
+	unsigned not_available = 0;
 
-	static const char *tab_lables[] = {
+	/* Encoder-specific labels - similar to jesd_status */
+	static const char *tab_labels_8b10b[] = {
 		"Lane#",
 		"Errors",
 		"Latency \n(Multiframes/Octets)",
@@ -935,6 +1005,21 @@ GtkWidget *set_per_lane_status(struct jesd204b_laneinfo *info, unsigned lanes)
 		"Initial Frame Sync",
 		"Initial Lane \nAlignment Sequence",
 	};
+
+	static const char *tab_labels_64b66b[] = {
+		"Lane#",
+		"Errors",
+		"Latency \n(Octets)",
+		"Extended multiblock alignment",
+	};
+
+	if (encoder == JESD204_ENCODER_8B10B) {
+		tab_labels = tab_labels_8b10b;
+		num_columns = 6;
+	} else {
+		tab_labels = tab_labels_64b66b;
+		num_columns = 4;
+	}
 
 	if (grid) {
 		gtk_widget_destroy(GTK_WIDGET(grid));
@@ -962,50 +1047,81 @@ GtkWidget *set_per_lane_status(struct jesd204b_laneinfo *info, unsigned lanes)
 		j = 0;
 
 		if (i == 0) {
-			for (j = 0; j < 6; j++) {
-				label = set_lable_text(NULL, tab_lables[j], NULL, 0);
+			for (j = 0; j < num_columns; j++) {
+				label = set_lable_text(NULL, tab_labels[j], NULL, 0);
 				my_gtk_label_set_xalign(GTK_LABEL(label), 0);
 				gtk_grid_attach(GTK_GRID(grid), label, i, j, 1, 1);
 			}
 		} else {
 			lane = info++;
-			octets_per_multifame = lane->k * lane->f;
+			j = 0;
 
-			latency = octets_per_multifame * lane->lane_latency_multiframes +
-				  lane->lane_latency_octets;
-
-			if ((latency - latency_min) >= octets_per_multifame) {
-				color = color_red;
-			} else {
-				if ((latency - latency_min) > (octets_per_multifame / 2)) {
-					color = color_orange;
-				} else {
-					color = color_green;
-				}
-			}
-
-			g_snprintf(text, sizeof(text), "Lane %d", i);
+			/* Lane number - common for both encoders */
+			g_snprintf(text, sizeof(text), "Lane %d", i - 1);
 			label = set_lable_text(NULL, text, NULL, 0);
 			gtk_grid_attach(GTK_GRID(grid), label, i, j++, 1, 1);
 
+			/* Errors - common for both encoders */
 			g_snprintf(text, sizeof(text), "%d", lane->lane_errors);
 			label = set_lable_text(NULL, text, "0", 0);
 			gtk_grid_attach(GTK_GRID(grid), label, i, j++, 1, 1);
 
-			g_snprintf(text, sizeof(text), "%d / %d", lane->lane_latency_multiframes,
-			           lane->lane_latency_octets);
-			label = set_lable_text(NULL, text, NULL, 0);
-			gtk_widget_modify_fg(label, GTK_STATE_NORMAL, &color);
-			gtk_grid_attach(GTK_GRID(grid), label, i, j++, 1, 1);
+			if (encoder == JESD204_ENCODER_8B10B) {
+				/* 8B10B specific fields */
+				octets_per_multifame = lane->k * lane->f;
+				latency = octets_per_multifame * lane->lane_latency_multiframes +
+					  lane->lane_latency_octets;
 
-			label = set_lable_text(NULL, lane->cgs_state, "DATA", 0);
-			gtk_grid_attach(GTK_GRID(grid), label, i, j++, 1, 1);
+				if ((latency - latency_min) >= octets_per_multifame) {
+					color = color_red;
+				} else {
+					if ((latency - latency_min) > (octets_per_multifame / 2)) {
+						color = color_orange;
+					} else {
+						color = color_green;
+					}
+				}
 
-			label = set_lable_text(NULL, lane->init_frame_sync, "Yes", 0);
-			gtk_grid_attach(GTK_GRID(grid), label, i, j++, 1, 1);
+				/* Latency */
+				g_snprintf(text, sizeof(text), "%d / %d", lane->lane_latency_multiframes,
+				           lane->lane_latency_octets);
+				label = set_lable_text(NULL, text, NULL, 0);
+				gtk_widget_override_color(label, GTK_STATE_FLAG_NORMAL, &color);
+				gtk_grid_attach(GTK_GRID(grid), label, i, j++, 1, 1);
 
-			label = set_lable_text(NULL, lane->init_lane_align_seq, "Yes", 0);
-			gtk_grid_attach(GTK_GRID(grid), label, i, j++, 1, 1);
+				/* CGS State */
+				label = set_lable_text(NULL, lane->cgs_state, "DATA", 0);
+				gtk_grid_attach(GTK_GRID(grid), label, i, j++, 1, 1);
+
+				/* Initial Frame Sync */
+				label = set_lable_text(NULL, lane->init_frame_sync, "Yes", 0);
+				gtk_grid_attach(GTK_GRID(grid), label, i, j++, 1, 1);
+
+				/* Initial Lane Alignment Sequence */
+				label = set_lable_text(NULL, lane->init_lane_align_seq, "Yes", 0);
+				gtk_grid_attach(GTK_GRID(grid), label, i, j++, 1, 1);
+			} else {
+				/* 64B66B specific fields */
+				color = color_green;
+				if (lane->lane_latency_octets == 0 && lane->lane_latency_min == 0 && lane->lane_latency_max == 0) {
+					not_available = 1;
+				} else if (lane->lane_latency_octets < lane->lane_latency_min || lane->lane_latency_octets > lane->lane_latency_max) {
+					color = color_red;
+				}
+
+				/* Latency */
+				if (not_available) {
+					g_snprintf(text, sizeof(text), "N/A");
+				} else {
+					g_snprintf(text, sizeof(text), "%d", lane->lane_latency_octets);
+				}
+				label = set_lable_text(NULL, text, NULL, 0);
+				gtk_widget_override_color(label, GTK_STATE_FLAG_NORMAL, &color);
+				gtk_grid_attach(GTK_GRID(grid), label, i, j++, 1, 1);
+				/* Extended multiblock alignment */
+				label = set_lable_text(NULL, lane->ext_multiblock_align_state, "EMB_LOCK", 0);
+				gtk_grid_attach(GTK_GRID(grid), label, i, j++, 1, 1);
+			}
 		}
 	}
 
@@ -1015,15 +1131,15 @@ GtkWidget *set_per_lane_status(struct jesd204b_laneinfo *info, unsigned lanes)
 	return grid;
 }
 
-
-
-void jesd_update_status(const char *path)
+int jesd_update_status(const char *path)
 {
 	struct jesd204b_jesd204_status info;
 	float measured, reported, div40;
-	GdkColor color;
+	GdkRGBA color;
+	int encoder;
 
 	read_jesd204_status(path, &info);
+	encoder = read_encoding(path);
 
 	set_lable_text(link_state,(char *) &info.link_state, "enabled", 0);
 	set_lable_text(link_status, (char *)&info.link_status, "DATA", 0);
@@ -1033,7 +1149,12 @@ void jesd_update_status(const char *path)
 	set_lable_text(lane_rate_div,(char *) &info.lane_rate_div, NULL, 0);
 	set_lable_text(lmfc_rate,(char *) &info.lmfc_rate, NULL, 0);
 
-	set_lable_text(sync_state, (char *)&info.sync_state, "deasserted", 0);
+	/* SYNC~ is only available for 8B10B encoder */
+	if (encoder == JESD204_ENCODER_8B10B) {
+		set_lable_text(sync_state, (char *)&info.sync_state, "deasserted", 0);
+	} else {
+		set_lable_text(sync_state, "N/A", "N/A", 0);
+	}
 	set_lable_text(sysref_captured, (char *)&info.sysref_captured, "No", 1);
 	set_lable_text(sysref_alignment_error, (char *)&info.sysref_alignment_error,
 	               "Yes", 1);
@@ -1049,7 +1170,7 @@ void jesd_update_status(const char *path)
 		color = color_green;
 	}
 
-	gtk_widget_modify_fg(measured_link_clock, GTK_STATE_NORMAL, &color);
+	gtk_widget_override_color(measured_link_clock, GTK_STATE_FLAG_NORMAL, &color);
 
 	if (reported > (div40 * (1 + PPM(CLOCK_ACCURACY))) ||
 		reported < (div40 * (1 - PPM(CLOCK_ACCURACY)))) {
@@ -1058,10 +1179,12 @@ void jesd_update_status(const char *path)
 		color = color_green;
 	}
 
-	gtk_widget_modify_fg(lane_rate_div, GTK_STATE_NORMAL, &color);
+	gtk_widget_override_color(lane_rate_div, GTK_STATE_FLAG_NORMAL, &color);
+
+	return encoder;
 }
 
-static int update_status(GtkComboBoxText *combo_box)
+static int update_status(GtkComboBoxText *combo_box, int *encoder)
 {
 	int cnt = 0;
 	char *path;
@@ -1074,9 +1197,9 @@ static int update_status(GtkComboBoxText *combo_box)
 
 	g_mutex_lock(mutex);
 	path = get_full_device_path(basedir, item);
-	jesd_update_status(path);
+	*encoder = jesd_update_status(path);
 	cnt = read_all_laneinfo(path, lane_info);
-	grid = set_per_lane_status(lane_info, cnt);
+	grid = set_per_lane_status(lane_info, cnt, *encoder, path);
 	g_mutex_unlock(mutex);
 
 	return cnt;
@@ -1084,10 +1207,11 @@ static int update_status(GtkComboBoxText *combo_box)
 
 static gboolean update_page(void)
 {
+	int encoder;
 	gint page = gtk_notebook_get_current_page(nbook);
 
 	if (page == 0) {
-		update_status(GTK_COMBO_BOX_TEXT(jesd_core_selection));
+		update_status(GTK_COMBO_BOX_TEXT(jesd_core_selection), &encoder);
 	}
 
 	return TRUE;
@@ -1095,7 +1219,10 @@ static gboolean update_page(void)
 
 void jesd_core_selection_cb(GtkComboBoxText *combo_box, gpointer user_data)
 {
-	create_and_fill_model(update_status(combo_box));
+	int encoder, cnt;
+
+	cnt = update_status(combo_box, &encoder);
+	create_and_fill_model(cnt, encoder);
 }
 
 int main(int argc, char *argv[])
@@ -1145,11 +1272,12 @@ int main(int argc, char *argv[])
 
 
 	setlocale(LC_NUMERIC, "C");
-	mutex = g_mutex_new();
+	mutex = g_new(GMutex, 1);
+	g_mutex_init(mutex);
 
 	/* init threads */
-	gdk_threads_init();
-	gdk_threads_enter();
+	/* gdk_threads_init() is deprecated in GTK3 */
+	/* Thread safety is handled automatically */
 
 	gtk_init(&argc, &argv);
 
@@ -1170,9 +1298,9 @@ int main(int argc, char *argv[])
 		lane[i] = GTK_WIDGET(gtk_builder_get_object(builder, text));
 	}
 
-	gdk_color_parse("red", &color_red);
-	gdk_color_parse("green", &color_green);
-	gdk_color_parse("orange", &color_orange);
+	gdk_rgba_parse(&color_red, "red");
+	gdk_rgba_parse(&color_green, "green");
+	gdk_rgba_parse(&color_orange, "orange");
 
 	link_state = GTK_WIDGET(gtk_builder_get_object(builder, "link_state"));
 	measured_link_clock = GTK_WIDGET(gtk_builder_get_object(builder,
@@ -1264,7 +1392,7 @@ int main(int argc, char *argv[])
 
 	/* enter the GTK main loop */
 	gtk_main();
-	gdk_threads_leave();
+	/* gdk_threads_leave() is deprecated */
 
 	return 0;
 }
