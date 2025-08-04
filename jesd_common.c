@@ -49,9 +49,11 @@
 
 char *get_full_device_path(const char *basedir, const char *device)
 {
-	static char path[PATH_MAX];
+	char *path = malloc(PATH_MAX);
+	if (!path)
+		return NULL;
 
-	snprintf(path, sizeof(path), "%s/%s", basedir, device);
+	snprintf(path, PATH_MAX, "%s/%s", basedir, device);
 
 	return path;
 }
@@ -118,13 +120,21 @@ int read_encoding(const char *basedir)
 	else if (!f)
 		return -errno;
 
-	ret = fread(encoder, sizeof(encoder), 1, f);
+	ret = fread(encoder, sizeof(encoder) - 1, 1, f);
 	if (ret != 1) {
 		if (!feof(f)) {
 			fclose(f);
 			return JESD204_ENCODER_8B10B; /* Default to 8b10b on read error */
 		}
 	}
+	
+	/* Ensure null termination */
+	encoder[sizeof(encoder) - 1] = '\0';
+	
+	/* Remove trailing newline if present */
+	char *newline = strchr(encoder, '\n');
+	if (newline)
+		*newline = '\0';
 
 	if (!strcmp(encoder, "8b10b"))
 		ret = JESD204_ENCODER_8B10B;
@@ -163,7 +173,7 @@ int read_laneinfo(const char *basedir, unsigned lane,
 		ret += fscanf(pFile, "State of Extended multiblock alignment:%s\n",
 			      (char *)&info->ext_multiblock_align_state);
 		/* Ignore return value since optional */
-		fscanf(pFile, "Lane Latency: %u (min/max %u/%u)n",
+		fscanf(pFile, "Lane Latency: %u (min/max %u/%u)\n",
 		       &info->lane_latency_octets,
 		       &info->lane_latency_min, &info->lane_latency_max);
 
@@ -186,8 +196,9 @@ int read_laneinfo(const char *basedir, unsigned lane,
 		      &info->scr, &info->f);
 
 	if (ret <= 0) {
+		int saved_errno = errno;
 		fclose(pFile);
-		return -errno;
+		return -saved_errno;
 	}
 
 	ret += fscanf(pFile,

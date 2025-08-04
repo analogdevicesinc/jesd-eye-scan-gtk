@@ -184,9 +184,13 @@ static int create_and_fill_model(unsigned active_lanes, int encoder)
 		gtk_tree_store_append(treestore, &toplevel, NULL);
 		gtk_tree_store_set(treestore, &toplevel, COLUMN, temp, -1);
 
-		JESD204_TREE_STORE_NEW_ROW_VALF("Lane Rate (Gbps)",
-						(double)get_lane_rate(lane) /
-						1000000000);
+		unsigned long long lane_rate = get_lane_rate(lane);
+		if (lane_rate == 0) {
+			JESD204_TREE_STORE_NEW_ROW_STRING("Lane Rate (Gbps)", "N/A");
+		} else {
+			JESD204_TREE_STORE_NEW_ROW_VALF("Lane Rate (Gbps)",
+							(double)lane_rate / 1000000000);
+		}
 
 		JESD204_TREE_STORE_NEW_ROW_VAL("Device ID (DID)",
 					       lane_info[lane].did);
@@ -292,7 +296,7 @@ int print_output_sys(void *err, const char *str, ...)
 	char buf[250];
 	int len;
 
-	bzero(buf, 250);
+	memset(buf, 0, 250);
 	va_start(args, str);
 	len = vsnprintf(buf, sizeof(buf), str, args);
 	va_end(args);
@@ -1167,9 +1171,12 @@ int jesd_update_status(const char *path)
 	set_lable_text(reported_device_clock, (char *)&info.reported_device_clock, NULL, 0);
 	set_lable_text(desired_device_clock, (char *)&info.desired_device_clock, NULL, 0);
 
-	sscanf((char *)&info.measured_link_clock, "%f", &measured);
-	sscanf((char *)&info.reported_link_clock, "%f", &reported);
-	sscanf((char *)&info.lane_rate_div, "%f", &div40);
+	if (sscanf((char *)&info.measured_link_clock, "%f", &measured) != 1)
+		measured = 0.0f;
+	if (sscanf((char *)&info.reported_link_clock, "%f", &reported) != 1)
+		reported = 0.0f;
+	if (sscanf((char *)&info.lane_rate_div, "%f", &div40) != 1)
+		div40 = 0.0f;
 
 	if (measured > (reported * (1 + PPM(CLOCK_ACCURACY))) ||
 	    measured < (reported * (1 - PPM(CLOCK_ACCURACY)))) {
@@ -1192,9 +1199,12 @@ int jesd_update_status(const char *path)
 	/* Device clock validation - similar to jesd_status.c */
 	if (info.measured_device_clock[0] != 'N') {
 		float measured_dev, reported_dev, desired_dev;
-		sscanf((char *)&info.measured_device_clock, "%f", &measured_dev);
-		sscanf((char *)&info.reported_device_clock, "%f", &reported_dev);
-		sscanf((char *)&info.desired_device_clock, "%f", &desired_dev);
+		if (sscanf((char *)&info.measured_device_clock, "%f", &measured_dev) != 1)
+			measured_dev = 0.0f;
+		if (sscanf((char *)&info.reported_device_clock, "%f", &reported_dev) != 1)
+			reported_dev = 0.0f;
+		if (sscanf((char *)&info.desired_device_clock, "%f", &desired_dev) != 1)
+			desired_dev = 0.0f;
 
 		if (measured_dev > (reported_dev * (1 + PPM(CLOCK_ACCURACY))) ||
 		    measured_dev < (reported_dev * (1 - PPM(CLOCK_ACCURACY)))) {
@@ -1229,9 +1239,14 @@ static int update_status(GtkComboBoxText *combo_box, int *encoder)
 
 	g_mutex_lock(mutex);
 	path = get_full_device_path(basedir, item);
+	if (!path) {
+		g_free(item);
+		return;
+	}
 	*encoder = jesd_update_status(path);
 	cnt = read_all_laneinfo(path, lane_info);
 	grid = set_per_lane_status(lane_info, cnt, *encoder, path);
+	free(path);
 	g_mutex_unlock(mutex);
 
 	return cnt;

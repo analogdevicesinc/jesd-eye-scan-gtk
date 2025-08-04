@@ -307,11 +307,18 @@ int jesd_update_status(WINDOW *win, int x, const char *device)
 	     c_measured_device_clock, c_reported_device_clock;
 	int y = 1, pos = 0;
 
-	read_jesd204_status(get_full_device_path(basedir, device), &info);
+	char *path = get_full_device_path(basedir, device);
+	if (!path)
+		return;
+	read_jesd204_status(path, &info);
+	free(path);
 
-	sscanf((char *)&info.measured_link_clock, "%f", &measured);
-	sscanf((char *)&info.reported_link_clock, "%f", &reported);
-	sscanf((char *)&info.lane_rate_div, "%f", &div40);
+	if (sscanf((char *)&info.measured_link_clock, "%f", &measured) != 1)
+		measured = 0.0f;
+	if (sscanf((char *)&info.reported_link_clock, "%f", &reported) != 1)
+		reported = 0.0f;
+	if (sscanf((char *)&info.lane_rate_div, "%f", &div40) != 1)
+		div40 = 0.0f;
 
 	if (measured > (reported * (1 + PPM(CLOCK_ACCURACY))) ||
 	    measured < (reported * (1 - PPM(CLOCK_ACCURACY))))
@@ -326,9 +333,12 @@ int jesd_update_status(WINDOW *win, int x, const char *device)
 		c_lane_rate_div = C_GOOD;
 
 	if (info.measured_device_clock[0] != 'N') {
-		sscanf((char *)&info.measured_device_clock, "%f", &measured);
-		sscanf((char *)&info.reported_device_clock, "%f", &reported);
-		sscanf((char *)&info.desired_device_clock, "%f", &div40);
+		if (sscanf((char *)&info.measured_device_clock, "%f", &measured) != 1)
+			measured = 0.0f;
+		if (sscanf((char *)&info.reported_device_clock, "%f", &reported) != 1)
+			reported = 0.0f;
+		if (sscanf((char *)&info.desired_device_clock, "%f", &div40) != 1)
+			div40 = 0.0f;
 
 		if (measured > (reported * (1 + PPM(CLOCK_ACCURACY))) ||
 		    measured < (reported * (1 - PPM(CLOCK_ACCURACY))))
@@ -535,7 +545,11 @@ int main(int argc, char *argv[])
 
 	while (true) {
 
-		encoder = read_encoding(get_full_device_path(basedir, jesd_devices[dev_idx]));
+		char *path = get_full_device_path(basedir, jesd_devices[dev_idx]);
+		if (!path)
+			continue;
+		encoder = read_encoding(path);
+		free(path);
 		if (encoder == JESD204_ENCODER_8B10B)
 			x = jesd_setup_subwin(stat_win, "(STATUS)", link_status_labels);
 		else
@@ -544,8 +558,11 @@ int main(int argc, char *argv[])
 		jesd_update_status(stat_win, x, jesd_devices[dev_idx]);
 		jesd_redo_r_box(stat_win, simple);
 
-		cnt = read_all_laneinfo(get_full_device_path(basedir, jesd_devices[dev_idx]),
-					lane_info);
+		path = get_full_device_path(basedir, jesd_devices[dev_idx]);
+		if (!path)
+			continue;
+		cnt = read_all_laneinfo(path, lane_info);
+		free(path);
 		if (cnt) {
 			if (!simple)
 				box(lane_win, 0, 0);
