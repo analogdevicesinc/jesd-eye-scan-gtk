@@ -49,9 +49,11 @@
 
 char *get_full_device_path(const char *basedir, const char *device)
 {
-	static char path[PATH_MAX];
+	char *path = malloc(PATH_MAX);
+	if (!path)
+		return NULL;
 
-	snprintf(path, sizeof(path), "%s/%s", basedir, device);
+	snprintf(path, PATH_MAX, "%s/%s", basedir, device);
 
 	return path;
 }
@@ -74,13 +76,20 @@ int jesd_find_devices(const char *basedir, const char *driver, const char *file_
 	}
 
 	while ((de = readdir(dr)) != NULL) {
-		snprintf(stat_path, sizeof(stat_path), "%s/%s", path, de->d_name);
+		int ret_snprintf;
+		
+		ret_snprintf = snprintf(stat_path, sizeof(stat_path), "%s/%s", path, de->d_name);
+		if (ret_snprintf >= (int)sizeof(stat_path))
+			continue; /* Path too long, skip */
 
 		if (lstat(stat_path, &sfile) == -1)
 			continue;
 
 		if (file_exists && S_ISLNK(sfile.st_mode)) {
-			snprintf(stat_path, sizeof(stat_path), "%s/%s/%s", path, de->d_name, file_exists);
+			ret_snprintf = snprintf(stat_path, sizeof(stat_path), "%s/%s/%s", path, de->d_name, file_exists);
+			if (ret_snprintf >= (int)sizeof(stat_path))
+				continue; /* Path too long, skip */
+			
 			if (stat(stat_path, &efile) == 0)
 				use = 1;
 			else
@@ -107,23 +116,37 @@ int read_encoding(const char *basedir)
 
 	memset(encoder, 0, sizeof(encoder));
 
-	sprintf(temp, "%s/encoder", basedir);
+	snprintf(temp, sizeof(temp), "%s/encoder", basedir);
 	f = fopen(temp, "r");
 	/*
 	 * If the file is not there, default to 8b10b. It might be an older
 	 * kernel and, most likely, only supports jesd204b
 	 */
 	if (!f && errno == ENOENT)
-	        return JESD204_ENCODER_8B10B;
+		return JESD204_ENCODER_8B10B;
 	else if (!f)
 		return -errno;
 
-	fread(encoder, sizeof(encoder), 1, f);
+	ret = fread(encoder, sizeof(encoder) - 1, 1, f);
+	if (ret != 1) {
+		if (!feof(f)) {
+			fclose(f);
+			return JESD204_ENCODER_8B10B; /* Default to 8b10b on read error */
+		}
+	}
+	
+	/* Ensure null termination */
+	encoder[sizeof(encoder) - 1] = '\0';
+	
+	/* Remove trailing newline if present */
+	char *newline = strchr(encoder, '\n');
+	if (newline)
+		*newline = '\0';
 
 	if (!strcmp(encoder, "8b10b"))
-	        ret = JESD204_ENCODER_8B10B;
+		ret = JESD204_ENCODER_8B10B;
 	else
-	        ret = JESD204_ENCODER_64B66B;
+		ret = JESD204_ENCODER_64B66B;
 
 	fclose(f);
 
@@ -143,7 +166,7 @@ int read_laneinfo(const char *basedir, unsigned lane,
 
 	memset(info, 0, sizeof(*info));
 
-	sprintf(temp, "%s/lane%d_info", basedir, lane);
+	snprintf(temp, sizeof(temp), "%s/lane%d_info", basedir, lane);
 
 	pFile = fopen(temp, "r");
 
@@ -152,8 +175,16 @@ int read_laneinfo(const char *basedir, unsigned lane,
 
 	ret = fscanf(pFile, "Errors: %u\n", &info->lane_errors);
 	if (encoder == JESD204_ENCODER_64B66B) {
+
+
 		ret += fscanf(pFile, "State of Extended multiblock alignment:%s\n",
 			      (char *)&info->ext_multiblock_align_state);
+		/* Optional field - ignore if not present */
+		int latency_ret = fscanf(pFile, "Lane Latency: %u (min/max %u/%u)\n",
+		       &info->lane_latency_octets,
+		       &info->lane_latency_min, &info->lane_latency_max);
+		(void)latency_ret; /* Suppress unused variable warning */
+
 		goto close_f;
 	};
 	ret += fscanf(pFile, "CGS state: %s\n", (char *)&info->cgs_state);
@@ -173,8 +204,9 @@ int read_laneinfo(const char *basedir, unsigned lane,
 		      &info->scr, &info->f);
 
 	if (ret <= 0) {
+		int saved_errno = errno;
 		fclose(pFile);
-		return -errno;
+		return -saved_errno;
 	}
 
 	ret += fscanf(pFile,
@@ -219,9 +251,8 @@ int read_all_laneinfo(const char *path, struct jesd204b_laneinfo lane_info[MAX_L
 
 				return cnt;
 
-			} else {
+			} else
 				cnt++;
-			}
 		}
 	} else {
 		fprintf(stderr, "Failed to find JESD device: %s\n", path);
@@ -251,7 +282,7 @@ int read_jesd204_status(const char *basedir,
 	if (encoder < 0)
 		return encoder;
 
-	sprintf(temp, "%s/status", basedir);
+	snprintf(temp, sizeof(temp), "%s/status", basedir);
 
 	memset(info, 0, sizeof(*info));
 
@@ -275,9 +306,9 @@ int read_jesd204_status(const char *basedir,
 
 	if (ret == 1) {
 		ret = fscanf(pFile, "Reported Device Clock: %s MHz\n",
-			(char *)&info->reported_device_clock);
+			     (char *)&info->reported_device_clock);
 		ret = fscanf(pFile, "Desired Device Clock: %s MHz\n",
-			(char *)&info->desired_device_clock);
+			     (char *)&info->desired_device_clock);
 	} else {
 		set_not_availabe(info->measured_device_clock);
 		set_not_availabe(info->reported_device_clock);

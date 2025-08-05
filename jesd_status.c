@@ -3,7 +3,7 @@
 *   @brief  JESD204 Status Information Utility
 *   @author Michael Hennerich (michael.hennerich@analog.com)
 ********************************************************************************
-* Copyright 2019 (c) Analog Devices, Inc.
+* Copyright 2019-2025 (c) Analog Devices, Inc.
 *
 * All rights reserved.
 *
@@ -112,6 +112,7 @@ static const char *lane_status_labels[] = {
 static const char *lane_status_labels_64b66b[] = {
 	"Lane#",
 	"Errors",
+	"Latency (Octets)",
 	"Extended multiblock alignment",
 	NULL
 };
@@ -143,6 +144,7 @@ int jesd_get_strlen(WINDOW *win, int x)
 	int x1, y1;
 
 	getyx(win, y1, x1);
+	(void)y1;  /* Suppress unused variable warning */
 
 	return x1 - x;
 }
@@ -202,9 +204,10 @@ int update_lane_status(WINDOW *win, int x, struct jesd204b_laneinfo *info,
 		       unsigned lanes)
 {
 	struct jesd204b_laneinfo *lane;
-	enum color_pairs c;
+	enum color_pairs c = C_ERR;
 	int octets_per_multifame, latency_min, latency, i, y, pos = 0;
 	struct jesd204b_laneinfo *tmp = info;
+	bool not_available = false;
 
 	if (!lanes)
 		return 0;
@@ -222,17 +225,27 @@ int update_lane_status(WINDOW *win, int x, struct jesd204b_laneinfo *info,
 		y = 1;
 
 		lane = info++;
-		octets_per_multifame = lane->k * lane->f;
 
-		latency = octets_per_multifame * lane->lane_latency_multiframes +
-			  lane->lane_latency_octets;
+		if (encoder == JESD204_ENCODER_64B66B) {
+			if (lane->lane_latency_octets == 0 && lane->lane_latency_min == 0 && lane->lane_latency_max == 0) {
+				c = C_GOOD;
+				not_available = true;
+			} else if (lane->lane_latency_octets < lane->lane_latency_min || lane->lane_latency_octets > lane->lane_latency_max) {
+				c = C_ERR;
+			}
+		} else {
+			octets_per_multifame = lane->k * lane->f;
 
-		if ((latency - latency_min) >= octets_per_multifame)
-			c = C_ERR;
-		else if ((latency - latency_min) > (octets_per_multifame / 2))
-			c = C_CRIT;
-		else
-			c = C_GOOD;
+			latency = octets_per_multifame * lane->lane_latency_multiframes +
+				  lane->lane_latency_octets;
+
+			if ((latency - latency_min) >= octets_per_multifame)
+				c = C_ERR;
+			else if ((latency - latency_min) > (octets_per_multifame / 2))
+				c = C_CRIT;
+			else
+				c = C_GOOD;
+		}
 
 		wcolor_set(win, C_NORM, NULL);
 
@@ -251,6 +264,15 @@ int update_lane_status(WINDOW *win, int x, struct jesd204b_laneinfo *info,
 		pos = jesd_maxx(pos, jesd_get_strlen(win, x));
 
 		if (encoder == JESD204_ENCODER_64B66B) {
+			wcolor_set(win, c, NULL);
+			jesd_clear_line_from(win, y, x);
+			if (not_available) {
+				mvwprintw(win, y++, x, "N/A");
+			} else {
+				mvwprintw(win, y++, x, "%u", lane->lane_latency_octets);
+			}
+			pos = jesd_maxx(pos, jesd_get_strlen(win, x));
+
 			pos = jesd_maxx(pos, jesd_print_win_exp(win, y++, x,
 								lane->ext_multiblock_align_state,
 								"EMB_LOCK", 0, true));
@@ -282,14 +304,21 @@ int jesd_update_status(WINDOW *win, int x, const char *device)
 	struct jesd204b_jesd204_status info;
 	float measured, reported, div40;
 	enum color_pairs c_measured_link_clock, c_lane_rate_div,
-		c_measured_device_clock, c_reported_device_clock;
+	     c_measured_device_clock, c_reported_device_clock;
 	int y = 1, pos = 0;
 
-	read_jesd204_status(get_full_device_path(basedir, device), &info);
+	char *path = get_full_device_path(basedir, device);
+	if (!path)
+		return -1;
+	read_jesd204_status(path, &info);
+	free(path);
 
-	sscanf((char *)&info.measured_link_clock, "%f", &measured);
-	sscanf((char *)&info.reported_link_clock, "%f", &reported);
-	sscanf((char *)&info.lane_rate_div, "%f", &div40);
+	if (sscanf((char *)&info.measured_link_clock, "%f", &measured) != 1)
+		measured = 0.0f;
+	if (sscanf((char *)&info.reported_link_clock, "%f", &reported) != 1)
+		reported = 0.0f;
+	if (sscanf((char *)&info.lane_rate_div, "%f", &div40) != 1)
+		div40 = 0.0f;
 
 	if (measured > (reported * (1 + PPM(CLOCK_ACCURACY))) ||
 	    measured < (reported * (1 - PPM(CLOCK_ACCURACY))))
@@ -304,18 +333,21 @@ int jesd_update_status(WINDOW *win, int x, const char *device)
 		c_lane_rate_div = C_GOOD;
 
 	if (info.measured_device_clock[0] != 'N') {
-		sscanf((char *)&info.measured_device_clock, "%f", &measured);
-		sscanf((char *)&info.reported_device_clock, "%f", &reported);
-		sscanf((char *)&info.desired_device_clock, "%f", &div40);
+		if (sscanf((char *)&info.measured_device_clock, "%f", &measured) != 1)
+			measured = 0.0f;
+		if (sscanf((char *)&info.reported_device_clock, "%f", &reported) != 1)
+			reported = 0.0f;
+		if (sscanf((char *)&info.desired_device_clock, "%f", &div40) != 1)
+			div40 = 0.0f;
 
 		if (measured > (reported * (1 + PPM(CLOCK_ACCURACY))) ||
-		measured < (reported * (1 - PPM(CLOCK_ACCURACY))))
+		    measured < (reported * (1 - PPM(CLOCK_ACCURACY))))
 			c_measured_device_clock = C_ERR;
 		else
 			c_measured_device_clock = C_GOOD;
 
 		if (reported > (div40 * (1 + PPM(CLOCK_ACCURACY))) ||
-		reported < (div40 * (1 - PPM(CLOCK_ACCURACY))))
+		    reported < (div40 * (1 - PPM(CLOCK_ACCURACY))))
 			c_reported_device_clock = C_ERR;
 		else
 			c_reported_device_clock = C_GOOD;
@@ -386,7 +418,7 @@ static void jesd_redo_r_box(WINDOW *win, const int simple)
 {
 	int x, y;
 
-	if(simple)
+	if (simple)
 		return;
 
 	getmaxyx(win, y, x);
@@ -513,7 +545,11 @@ int main(int argc, char *argv[])
 
 	while (true) {
 
-		encoder = read_encoding(get_full_device_path(basedir, jesd_devices[dev_idx]));
+		char *path = get_full_device_path(basedir, jesd_devices[dev_idx]);
+		if (!path)
+			continue;
+		encoder = read_encoding(path);
+		free(path);
 		if (encoder == JESD204_ENCODER_8B10B)
 			x = jesd_setup_subwin(stat_win, "(STATUS)", link_status_labels);
 		else
@@ -522,8 +558,11 @@ int main(int argc, char *argv[])
 		jesd_update_status(stat_win, x, jesd_devices[dev_idx]);
 		jesd_redo_r_box(stat_win, simple);
 
-		cnt = read_all_laneinfo(get_full_device_path(basedir, jesd_devices[dev_idx]),
-					lane_info);
+		path = get_full_device_path(basedir, jesd_devices[dev_idx]);
+		if (!path)
+			continue;
+		cnt = read_all_laneinfo(path, lane_info);
+		free(path);
 		if (cnt) {
 			if (!simple)
 				box(lane_win, 0, 0);
