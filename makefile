@@ -2,6 +2,12 @@ DESTDIR=/usr/local
 CFLAGS= -g -O2 -Wall
 CFLAGS+= `pkg-config --cflags gtk+-3.0` -Wl,--export-dynamic
 LIBS= `pkg-config --libs gtk+-3.0`
+
+# Optional libiio support
+ifdef USE_LIBIIO
+CFLAGS+= -DUSE_LIBIIO `pkg-config --cflags libiio`
+LIBS+= `pkg-config --libs libiio`
+endif
 src = $(wildcard *.c)
 obj = $(src:.c=.o)
 
@@ -9,7 +15,7 @@ obj = $(src:.c=.o)
 all: jesd_status jesd_eye_scan
 
 jesd_status: jesd_status.o jesd_common.o
-	$(CC) -o $@ $^ -lncurses
+	$(CC) -o $@ $^ -lncurses $(if $(USE_LIBIIO),`pkg-config --libs libiio`)
 
 jesd_eye_scan: jesd_eye_scan.o jesd_common.o
 	$(CC) -o $@ $^ $(CFLAGS) $(LIBS) -lm

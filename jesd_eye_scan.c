@@ -288,7 +288,16 @@ int get_devices(const char *path, const char *driver, const char *file,  GtkWidg
 {
 	int dev_num, i;
 
-	dev_num = jesd_find_devices(path, driver, file, jesd_devices, 0);
+	if (g_jesd_iio_ctx) {
+		/* Check if this is looking for transceiver devices */
+		if (strcmp(driver, XCVR_DRIVER_NAME) == 0 || strcmp(driver, XCVR_NEW_DRIVER_NAME) == 0) {
+			dev_num = jesd_iio_find_xcvr_devices(g_jesd_iio_ctx, jesd_devices);
+		} else {
+			dev_num = jesd_iio_find_devices(g_jesd_iio_ctx, jesd_devices);
+		}
+	} else {
+		dev_num = jesd_find_devices(path, driver, file, jesd_devices, 0);
+	}
 
 	for (i = 0; i < dev_num; i++)
 		gtk_combo_box_text_append_text(GTK_COMBO_BOX_TEXT(device_select),
@@ -472,6 +481,8 @@ int plot(struct jesd204b_xcvr_eyescan_info *info, char *file, unsigned lane,
 		fprintf(gp, "set output '%s'\n", file_png);
 	}
 
+
+	fprintf(gp, "set decimalsign locale\n");
 	fprintf(gp, "set view map\n");
 	fprintf(gp, "unset label\n");
 	fprintf(gp, "set contour base\n");
@@ -539,29 +550,17 @@ int plot(struct jesd204b_xcvr_eyescan_info *info, char *file, unsigned lane,
 
 int write_sysfs(char *filename, char *basedir, char *val)
 {
-	FILE *sysfsfp;
-	char temp[PATH_MAX];
-	int ret = 0;
-
-	snprintf(temp, sizeof(temp), "%s/%s", basedir, filename);
-	sysfsfp = fopen(temp, "w");
-
-	if (sysfsfp == NULL) {
-		return -errno;
-	}
-
-	ret = fprintf(sysfsfp, "%s", val);
-	fclose(sysfsfp);
-
-	return ret;
+	return jesd_write_attr(basedir, filename, val);
 }
 
 int get_eye_data(struct jesd204b_xcvr_eyescan_info *info, char *filename,
 		 char *basedir, char *filename_out)
 {
-	FILE *sysfsfp, *pFile;
+	FILE *sysfsfp = NULL, *pFile;
 	char temp[PATH_MAX];
 	unsigned long long *buf;
+	char *hex_buf = NULL;
+	char *hex_buf2 = NULL;
 	int ret = 0;
 	/* Check for integer overflow */
 	if (info->es_hsize > 0 && info->es_vsize > UINT_MAX / info->es_hsize) {
@@ -576,26 +575,84 @@ int get_eye_data(struct jesd204b_xcvr_eyescan_info *info, char *filename,
 		return -EINVAL;
 	}
 
-	buf = malloc(cnt * elem_size);
+	size_t total_size = cnt * elem_size;
+	buf = malloc(total_size);
 
 	if (buf == NULL) {
 		return -ENOMEM;
 	}
 
-	snprintf(temp, sizeof(temp), "%s/%s", basedir, filename);
-	sysfsfp = fopen(temp, "r");
+	/* Try libiio first if available */
+	if (g_jesd_iio_ctx) {
+		size_t chunk_size = 4095; /* 4096 - 1 for null terminator */
+		unsigned idx = 0;
 
-	if (sysfsfp == NULL) {
-		free(buf);
-		return -errno;
+		/* For libiio, construct the full filename path for reading */
+		struct iio_device *dev = get_iio_device_from_path(basedir);
+
+		/* Allocate buffer for hex string reads */
+		hex_buf2 = malloc(chunk_size + 1);
+		if (hex_buf2 == NULL) {
+			free(buf);
+			return -ENOMEM;
+		}
+
+		if (dev) {
+			long long int  eye_data_available;
+
+			/* Wait for data to be available */
+			do {
+				sleep(1);
+				ret = jesd_iio_device_attr_read_longlong(dev, "eye_data_available", &eye_data_available);
+				if (ret < 0 && ret != -EBUSY) {
+					fprintf(stderr, "Failed to read eye_data_available: %d\n", ret);
+					goto error_cleanup;
+				}
+			} while (ret == -EBUSY);
+
+			/* Read data in chunks until we have all bytes */
+			while (idx < cnt) {
+				hex_buf = hex_buf2;
+				ret = jesd_iio_device_attr_read(dev, "eye_data_partial", hex_buf, chunk_size + 1);
+				if (ret < 0) {
+					print_output_sys(stderr, "%s:%d: read failed (%d)\n",
+							 __func__, __LINE__, ret);
+					goto error_cleanup;
+				}
+
+
+				// Parse the comma-separated hex string
+				char *saveptr = NULL;
+				char *token = strtok_r(hex_buf, ",", &saveptr);
+
+				while (token && idx < cnt) {
+					if (info->lpm) {
+						((unsigned *)buf)[idx] = (unsigned)strtoul(token, NULL, 16);
+					} else {
+						((unsigned long long *)buf)[idx] = strtoull(token, NULL, 16);
+					}
+					token = strtok_r(NULL, ",", &saveptr);
+					idx++;
+				}
+			}
+			ret = idx;
+		}
+	} else {
+		/* Use sysfs method */
+		snprintf(temp, sizeof(temp), "%s/%s", basedir, filename);
+		sysfsfp = fopen(temp, "r");
+
+		if (sysfsfp == NULL) {
+			free(buf);
+			return -errno;
+		}
+
+		ret = fread(buf, info->lpm ? 4 : 8, cnt, sysfsfp);
+		fclose(sysfsfp);
 	}
 
-	ret = fread(buf, info->lpm ? 4 : 8, cnt, sysfsfp);
-
-	fclose(sysfsfp);
-
 	if (ret != cnt) {
-		print_output_sys(stderr, "%s:%d: read failed\n", __func__, __LINE__);
+		print_output_sys(stderr, "%s:%d: read failed ret %d cnt %d\n", __func__, __LINE__, ret, cnt);
 		return -EINVAL;
 	}
 
@@ -616,7 +673,18 @@ int get_eye_data(struct jesd204b_xcvr_eyescan_info *info, char *filename,
 		return -EINVAL;
 	}
 
+
 	return 0;
+error_cleanup:
+	if (sysfsfp)
+		fclose(sysfsfp);
+	if (hex_buf)
+		free(hex_buf);
+	if (buf)
+		free(buf);
+	return ret;
+
+
 }
 
 int get_eye(struct jesd204b_xcvr_eyescan_info *info, unsigned lane,
@@ -638,7 +706,6 @@ int get_eye(struct jesd204b_xcvr_eyescan_info *info, unsigned lane,
 
 	snprintf(temp, sizeof(temp), "lane%d_p%d.eye", lane, prescale);
 	ret = get_eye_data(info, JESD204B_EYE_DATA, info->gt_interface_path, temp);
-
 	if (ret) {
 		return ret;
 	}
@@ -667,16 +734,31 @@ int read_eyescan_info(const char *basedir,
 	char temp[PATH_MAX];
 	int ret;
 
-	snprintf(temp, sizeof(temp), "%s/eyescan_info", basedir);
-	pFile = fopen(temp, "r");
+	if (g_jesd_iio_ctx && strstr(basedir, "iio:")) {
+		char buf[1024];
+		ret = jesd_read_attr(basedir, "eyescan_info", buf, sizeof(buf));
+		if (ret < 0) {
+			print_output_sys(stderr, "Failed to read eyescan_info attribute\n");
+			print_output_sys(stderr, "Select axi-adxcvr-rx device!\n");
+			return ret;
+		}
 
-	if (pFile == NULL) {
-		print_output_sys(stderr, "Failed to read JESD204 device file: %s\n",
-				 temp);
+		pFile = fmemopen(buf, strlen(buf), "r");
+		if (!pFile) {
+			return -errno;
+		}
+	} else {
+		snprintf(temp, sizeof(temp), "%s/eyescan_info", basedir);
+		pFile = fopen(temp, "r");
 
-		print_output_sys(stderr, "Select axi-adxcvr-rx device!\n");
+		if (pFile == NULL) {
+			print_output_sys(stderr, "Failed to read JESD204 device file: %s\n",
+					 temp);
 
-		return -errno;
+			print_output_sys(stderr, "Select axi-adxcvr-rx device!\n");
+
+			return -errno;
+		}
 	}
 
 	ret = fscanf(pFile, "x%d,y%d CDRDW: %llu LPM: %d NL: %d LR: %lu\n",
@@ -1154,8 +1236,8 @@ int jesd_update_status(const char *path)
 	GdkRGBA color;
 	int encoder;
 
-	read_jesd204_status(path, &info);
-	encoder = read_encoding(path);
+	jesd_read_jesd204_status(path, &info);
+	encoder = jesd_read_encoding(path);
 
 	set_lable_text(link_state, (char *) &info.link_state, "enabled", 0);
 	set_lable_text(link_status, (char *)&info.link_status, "DATA", 0);
@@ -1247,15 +1329,24 @@ static int update_status(GtkComboBoxText *combo_box, int *encoder)
 	}
 
 	g_mutex_lock(mutex);
-	path = get_full_device_path(basedir, item);
-	if (!path) {
-		g_free(item);
-		return 0;
+	if (g_jesd_iio_ctx) {
+		path = strdup(item);
+		*encoder = jesd_update_status(path);
+		cnt = jesd_read_all_laneinfo(path, lane_info);
+		grid = set_per_lane_status(lane_info, cnt, *encoder, path);
+		free(path);
+	} else {
+		path = get_full_device_path(basedir, item);
+		if (!path) {
+			g_free(item);
+			g_mutex_unlock(mutex);
+			return 0;
+		}
+		*encoder = jesd_update_status(path);
+		cnt = jesd_read_all_laneinfo(path, lane_info);
+		grid = set_per_lane_status(lane_info, cnt, *encoder, path);
+		free(path);
 	}
-	*encoder = jesd_update_status(path);
-	cnt = read_all_laneinfo(path, lane_info);
-	grid = set_per_lane_status(lane_info, cnt, *encoder, path);
-	free(path);
 	g_mutex_unlock(mutex);
 
 	return cnt;
@@ -1290,15 +1381,19 @@ int main(int argc, char *argv[])
 	struct stat buf;
 	int ret, c, i, cnt = 0;
 	char *path = NULL;
+	char *uri = NULL;
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "p:")) != -1)
+	while ((c = getopt(argc, argv, "p:u:")) != -1)
 		switch (c) {
 		case 'p':
 			path = optarg;
 			remote = 1;
 			break;
-
+		case 'u':
+			uri = optarg;
+			remote = 1;
+			break;
 		case '?':
 			if (optopt == 'd' || optopt == 'p') {
 				fprintf(stderr, "Option -%c requires an argument.\n", optopt);
@@ -1320,10 +1415,19 @@ int main(int argc, char *argv[])
 		path = "";
 	}
 
-	ret = snprintf(basedir, sizeof(basedir), "%s/sys/bus/platform/drivers", path);
-
-	if (ret < 0) {
-		return EXIT_FAILURE;
+	if (uri || (path && strlen(path) == 0)) {
+		/* Use libiio */
+		g_jesd_iio_ctx = jesd_iio_create_context(uri);
+		if (!g_jesd_iio_ctx) {
+			fprintf(stderr, "Failed to create IIO context\n");
+			return EXIT_FAILURE;
+		}
+		strcpy(basedir, "iio:context");
+	} else {
+		ret = snprintf(basedir, sizeof(basedir), "%s/sys/bus/platform/drivers", path);
+		if (ret < 0) {
+			return EXIT_FAILURE;
+		}
 	}
 
 
@@ -1438,7 +1542,9 @@ int main(int argc, char *argv[])
 		get_devices(basedir, XCVR_NEW_DRIVER_NAME, "eyescan_info", device_select);
 	}
 	get_devices(basedir, JESD204_RX_DRIVER_NAME, "status", jesd_core_selection);
-	get_devices(basedir, JESD204_TX_DRIVER_NAME, "status", jesd_core_selection);
+	if (!g_jesd_iio_ctx) {
+		get_devices(basedir, JESD204_TX_DRIVER_NAME, "status", jesd_core_selection);
+	}
 
 	logo = GTK_IMAGE(gtk_builder_get_object(builder, "logo"));
 
@@ -1455,6 +1561,9 @@ int main(int argc, char *argv[])
 	/* enter the GTK main loop */
 	gtk_main();
 	/* gdk_threads_leave() is deprecated */
+
+	if (g_jesd_iio_ctx)
+		jesd_iio_destroy_context(g_jesd_iio_ctx);
 
 	return 0;
 }

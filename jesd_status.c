@@ -232,6 +232,8 @@ int update_lane_status(WINDOW *win, int x, struct jesd204b_laneinfo *info,
 				not_available = true;
 			} else if (lane->lane_latency_octets < lane->lane_latency_min || lane->lane_latency_octets > lane->lane_latency_max) {
 				c = C_ERR;
+			} else {
+				c = C_GOOD;
 			}
 		} else {
 			octets_per_multifame = lane->k * lane->f;
@@ -307,11 +309,15 @@ int jesd_update_status(WINDOW *win, int x, const char *device)
 	     c_measured_device_clock, c_reported_device_clock;
 	int y = 1, pos = 0;
 
-	char *path = get_full_device_path(basedir, device);
-	if (!path)
-		return -1;
-	read_jesd204_status(path, &info);
-	free(path);
+	if (g_jesd_iio_ctx) {
+		jesd_read_jesd204_status(device, &info);
+	} else {
+		char *path = get_full_device_path(basedir, device);
+		if (!path)
+			return -1;
+		jesd_read_jesd204_status(path, &info);
+		free(path);
+	}
 
 	if (sscanf((char *)&info.measured_link_clock, "%f", &measured) != 1)
 		measured = 0.0f;
@@ -448,11 +454,12 @@ int main(int argc, char *argv[])
 	int up_key = 'a', down_key = 'd';
 	int termx, termy, dev_num = 0;
 	char *path = NULL;
+	char *uri = NULL;
 	int dev_idx = 0;
 
 	opterr = 0;
 
-	while ((c = getopt(argc, argv, "svp:")) != -1)
+	while ((c = getopt(argc, argv, "svp:u:")) != -1)
 		switch (c) {
 		case 'p':
 			path = optarg;
@@ -463,6 +470,9 @@ int main(int argc, char *argv[])
 		case 'v':
 			up_key = 'k';
 			down_key = 'j';
+			break;
+		case 'u':
+			uri = optarg;
 			break;
 		case '?':
 			if (optopt == 'd' || optopt == 'p')
@@ -482,10 +492,21 @@ int main(int argc, char *argv[])
 	if (!path)
 		path = "";
 
-	snprintf(basedir, sizeof(basedir), "%s/sys/bus/platform/drivers", path);
-
-	dev_num = jesd_find_devices(basedir, JESD204_RX_DRIVER_NAME, "status", jesd_devices, 0);
-	dev_num = jesd_find_devices(basedir, JESD204_TX_DRIVER_NAME, "status", jesd_devices, dev_num);
+	if (uri || (path && strlen(path) == 0)) {
+		/* Use libiio */
+		g_jesd_iio_ctx = jesd_iio_create_context(uri);
+		if (!g_jesd_iio_ctx) {
+			fprintf(stderr, "Failed to create IIO context\n");
+			return 1;
+		}
+		dev_num = jesd_iio_find_devices(g_jesd_iio_ctx, jesd_devices);
+		strcpy(basedir, "iio:context");
+	} else {
+		/* Fall back to sysfs */
+		snprintf(basedir, sizeof(basedir), "%s/sys/bus/platform/drivers", path);
+		dev_num = jesd_find_devices(basedir, JESD204_RX_DRIVER_NAME, "status", jesd_devices, 0);
+		dev_num = jesd_find_devices(basedir, JESD204_TX_DRIVER_NAME, "status", jesd_devices, dev_num);
+	}
 	if (!dev_num) {
 		fprintf(stderr, "Failed to find JESD devices\n");
 		return 0;
@@ -544,12 +565,17 @@ int main(int argc, char *argv[])
 	jesd_set_current_device(0);
 
 	while (true) {
+		char *path = NULL;
 
-		char *path = get_full_device_path(basedir, jesd_devices[dev_idx]);
-		if (!path)
-			continue;
-		encoder = read_encoding(path);
-		free(path);
+		if (g_jesd_iio_ctx) {
+			encoder = jesd_read_encoding(jesd_devices[dev_idx]);
+		} else {
+			path = get_full_device_path(basedir, jesd_devices[dev_idx]);
+			if (!path)
+				continue;
+			encoder = jesd_read_encoding(path);
+		}
+
 		if (encoder == JESD204_ENCODER_8B10B)
 			x = jesd_setup_subwin(stat_win, "(STATUS)", link_status_labels);
 		else
@@ -558,11 +584,21 @@ int main(int argc, char *argv[])
 		jesd_update_status(stat_win, x, jesd_devices[dev_idx]);
 		jesd_redo_r_box(stat_win, simple);
 
-		path = get_full_device_path(basedir, jesd_devices[dev_idx]);
-		if (!path)
-			continue;
-		cnt = read_all_laneinfo(path, lane_info);
-		free(path);
+		if (g_jesd_iio_ctx) {
+			cnt = jesd_read_all_laneinfo(jesd_devices[dev_idx], lane_info);
+		} else {
+			if (!path) {
+				path = get_full_device_path(basedir, jesd_devices[dev_idx]);
+				if (!path)
+					continue;
+			}
+			cnt = jesd_read_all_laneinfo(path, lane_info);
+		}
+
+		if (path) {
+			free(path);
+			path = NULL;
+		}
 		if (cnt) {
 			if (!simple)
 				box(lane_win, 0, 0);
@@ -606,6 +642,9 @@ int main(int argc, char *argv[])
 	}
 
 	terminal_stop();
+
+	if (g_jesd_iio_ctx)
+		jesd_iio_destroy_context(g_jesd_iio_ctx);
 
 	return 0;
 }
