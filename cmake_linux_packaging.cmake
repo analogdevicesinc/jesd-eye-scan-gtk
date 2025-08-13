@@ -1,3 +1,12 @@
+####################################################################################
+## Copyright 2014-2025(c) Analog Devices, Inc. All rights reserved.
+##
+## An ADI specific BSD license, which can be found in the top level directory
+## of this repository (LICENSE.txt), and also on-line at:
+## https://github.com/analogdevicesinc/jesd-eye-scan-gtk/blob/main/LICENSE.txt
+####################################################################################
+
+
 # CMake packaging configuration for jesd-eye-scan-gtk
 set(CPACK_SET_DESTDIR ON)
 set(CPACK_GENERATOR "")  # Start with empty generator list

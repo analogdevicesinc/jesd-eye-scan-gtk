@@ -1,3 +1,11 @@
+####################################################################################
+## Copyright 2014-2025(c) Analog Devices, Inc. All rights reserved.
+##
+## An ADI specific BSD license, which can be found in the top level directory
+## of this repository (LICENSE.txt), and also on-line at:
+## https://github.com/analogdevicesinc/jesd-eye-scan-gtk/blob/main/LICENSE.txt
+####################################################################################
+
 cmake_minimum_required(VERSION 3.10)
 # Default version
 set(DEFAULT_PROJECT_VERSION "1.0.0")
