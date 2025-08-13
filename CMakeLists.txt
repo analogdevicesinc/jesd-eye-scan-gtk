@@ -1,3 +1,8 @@
+####################################################################################
+## Copyright (c) 2014 - 2025 Analog Devices, Inc.
+### SPDX short identifier: ADIBSD
+####################################################################################
+
 cmake_minimum_required(VERSION 3.10)
 # Default version
 set(DEFAULT_PROJECT_VERSION "1.0.0")
