@@ -1,3 +1,9 @@
+####################################################################################
+## Copyright (c) 2014 - 2025 Analog Devices, Inc.
+### SPDX short identifier: ADIBSD
+####################################################################################
+
+
 # CMake packaging configuration for jesd-eye-scan-gtk
 set(CPACK_SET_DESTDIR ON)
 set(CPACK_GENERATOR "")  # Start with empty generator list
