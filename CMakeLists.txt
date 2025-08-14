@@ -36,10 +36,22 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,--export-dynamic")
 find_package(PkgConfig REQUIRED)
 
 # Find GTK3
-pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
+option(USE_JESD_EYE_SCAN "Enable jesd_eye_scan support" ON)
+if(USE_JESD_EYE_SCAN)
+    pkg_check_modules(GTK3 REQUIRED gtk+-3.0)
+    set(JESD_EYE_SCAN_TARGET jesd_eye_scan)
+endif()
 
 # Find ncurses
-find_library(NCURSES_LIBRARY ncurses REQUIRED)
+option(USE_JESD_STATUS "Enable jesd_status support" ON)
+if(USE_JESD_STATUS)
+    find_library(NCURSES_LIBRARY ncurses REQUIRED)
+    set(JESD_STATUS_TARGET jesd_status)
+endif()
+
+if(NOT USE_JESD_STATUS AND NOT USE_JESD_EYE_SCAN)
+	message(SEND_ERROR "Cannot disable both jesd_status and jesd_eye_scan!")
+endif()
 
 # Optional libiio support
 option(USE_LIBIIO "Enable libiio support" OFF)
@@ -49,35 +61,47 @@ if(USE_LIBIIO)
 endif()
 
 # Include directories
-include_directories(${GTK3_INCLUDE_DIRS})
+if(USE_JESD_EYE_SCAN)
+	include_directories(${GTK3_INCLUDE_DIRS})
+endif()
+
 if(USE_LIBIIO)
     include_directories(${LIBIIO_INCLUDE_DIRS})
 endif()
 
 # Link directories  
-link_directories(${GTK3_LIBRARY_DIRS})
+if(USE_JESD_EYE_SCAN)
+	link_directories(${GTK3_LIBRARY_DIRS})
+endif()
+
 if(USE_LIBIIO)
     link_directories(${LIBIIO_LIBRARY_DIRS})
 endif()
 
 # Add compiler flags
-add_definitions(${GTK3_CFLAGS_OTHER})
+if(USE_JESD_EYE_SCAN)
+	add_definitions(${GTK3_CFLAGS_OTHER})
+endif()
 
 # Common source files
 set(COMMON_SOURCES jesd_common.c jesd_common.h)
 
 # jesd_status executable
-add_executable(jesd_status jesd_status.c ${COMMON_SOURCES})
-target_link_libraries(jesd_status ${NCURSES_LIBRARY})
-if(USE_LIBIIO)
-    target_link_libraries(jesd_status ${LIBIIO_LIBRARIES})
+if(USE_JESD_STATUS)
+    add_executable(${JESD_STATUS_TARGET} jesd_status.c ${COMMON_SOURCES})
+    target_link_libraries(jesd_status ${NCURSES_LIBRARY})
+    if(USE_LIBIIO)
+        target_link_libraries(jesd_status ${LIBIIO_LIBRARIES})
+    endif()
 endif()
 
 # jesd_eye_scan executable  
-add_executable(jesd_eye_scan jesd_eye_scan.c ${COMMON_SOURCES})
-target_link_libraries(jesd_eye_scan ${GTK3_LIBRARIES} m)
-if(USE_LIBIIO)
-    target_link_libraries(jesd_eye_scan ${LIBIIO_LIBRARIES})
+if(USE_JESD_EYE_SCAN)
+    add_executable(${JESD_EYE_SCAN_TARGET} jesd_eye_scan.c ${COMMON_SOURCES})
+    target_link_libraries(jesd_eye_scan ${GTK3_LIBRARIES} m)
+    if(USE_LIBIIO)
+        target_link_libraries(jesd_eye_scan ${LIBIIO_LIBRARIES})
+    endif()
 endif()
 
 # Set default install prefix to match Makefile
@@ -86,21 +110,23 @@ if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
 endif()
 
 # Install targets
-install(TARGETS jesd_status jesd_eye_scan
+install(TARGETS ${JESD_STATUS_TARGET} ${JESD_EYE_SCAN_TARGET}
     RUNTIME DESTINATION bin
 )
 
-install(FILES jesd.glade
-    DESTINATION share/jesd/
-)
+if(USE_JESD_EYE_SCAN)
+    install(FILES jesd.glade
+        DESTINATION share/jesd/
+    )
 
-install(FILES icons/ADIlogo.png
-    DESTINATION share/jesd/
-)
+    install(FILES icons/ADIlogo.png
+        DESTINATION share/jesd/
+    )
 
-install(FILES "jesd_eye_scan.desktop"
-    DESTINATION share/applications/
-)
+    install(FILES "jesd_eye_scan.desktop"
+        DESTINATION share/applications/
+    )
+endif()
 
 # Add custom clean target to match Makefile behavior
 add_custom_target(clean-extra
