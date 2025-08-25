@@ -239,7 +239,7 @@ int read_all_laneinfo(const char *path, struct jesd204b_laneinfo lane_info[MAX_L
 {
 	struct stat buf;
 	int i, ret, cnt = 0;
-	fprintf(stderr, "Failed to find JESD device: %s\n", path);
+
 	if (!stat(path, &buf)) {
 		for (i = 0; i < MAX_LANES; i++) {
 			ret = read_laneinfo(path, i, &lane_info[i]);
