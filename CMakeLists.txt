@@ -103,10 +103,11 @@ if(USE_JESD_STATUS)
     endif()
 endif()
 
-# jesd_eye_scan executable  
+# jesd_eye_scan executable
 if(USE_JESD_EYE_SCAN)
+    find_package(Threads REQUIRED)
     add_executable(${JESD_EYE_SCAN_TARGET} jesd_eye_scan.c ${COMMON_SOURCES})
-    target_link_libraries(jesd_eye_scan ${GTK3_LIBRARIES} m)
+    target_link_libraries(jesd_eye_scan ${GTK3_LIBRARIES} m Threads::Threads)
     if(USE_LIBIIO)
         target_link_libraries(jesd_eye_scan ${LIBIIO_LIBRARIES})
     endif()
