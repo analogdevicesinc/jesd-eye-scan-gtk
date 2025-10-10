@@ -466,7 +466,7 @@ int main(int argc, char *argv[])
 	if (!path)
 		path = "";
 
-	if (uri || (path && strlen(path) == 0)) {
+	if (uri) {
 		/* Use libiio */
 		g_jesd_iio_ctx = jesd_iio_create_context(uri);
 		if (!g_jesd_iio_ctx) {
