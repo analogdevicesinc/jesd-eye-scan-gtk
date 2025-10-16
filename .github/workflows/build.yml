@@ -1,4 +1,6 @@
 name: Build and Deploy JESD Eye Scan GTK
+permissions:
+  contents: read
 
 env:
   MAJOR: 0 
