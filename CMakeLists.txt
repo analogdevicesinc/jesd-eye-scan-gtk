@@ -57,8 +57,14 @@ if(USE_JESD_STATUS)
     set(JESD_STATUS_TARGET jesd_status)
 endif()
 
-if(NOT USE_JESD_STATUS AND NOT USE_JESD_EYE_SCAN)
-	message(SEND_ERROR "Cannot disable both jesd_status and jesd_eye_scan!")
+# jesd204_topology (no external dependencies)
+option(USE_JESD204_TOPOLOGY "Enable jesd204_topology support" ON)
+if(USE_JESD204_TOPOLOGY)
+    set(JESD204_TOPOLOGY_TARGET jesd204_topology)
+endif()
+
+if(NOT USE_JESD_STATUS AND NOT USE_JESD_EYE_SCAN AND NOT USE_JESD204_TOPOLOGY)
+	message(SEND_ERROR "Cannot disable all targets!")
 endif()
 
 # Optional libiio support
@@ -113,13 +119,18 @@ if(USE_JESD_EYE_SCAN)
     endif()
 endif()
 
+# jesd204_topology executable (standalone, no external dependencies)
+if(USE_JESD204_TOPOLOGY)
+    add_executable(${JESD204_TOPOLOGY_TARGET} jesd204_topology.c)
+endif()
+
 # Set default install prefix to match Makefile
 if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
     set(CMAKE_INSTALL_PREFIX "/usr/local" CACHE PATH "Install prefix" FORCE)
 endif()
 
 # Install targets
-install(TARGETS ${JESD_STATUS_TARGET} ${JESD_EYE_SCAN_TARGET}
+install(TARGETS ${JESD_STATUS_TARGET} ${JESD_EYE_SCAN_TARGET} ${JESD204_TOPOLOGY_TARGET}
     RUNTIME DESTINATION bin
 )
 
