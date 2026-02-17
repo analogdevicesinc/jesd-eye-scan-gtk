@@ -2,7 +2,7 @@
 [Desktop Entry]
 Type=Application
 Exec=@CMAKE_INSTALL_PREFIX@/bin/jesd_eye_scan
-Icon=@CMAKE_INSTALL_PREFIX@/share/jesd/ADIlogo.png
+Icon=@CMAKE_INSTALL_PREFIX@/share/jesd-eye-scan-gtk/ADIlogo.png
 Hidden=false
 NoDisplay=false
 Name[C]=jesd_eye_scan
