@@ -17,7 +17,7 @@ for exe in jesd_eye_scan jesd_status jesd204_topology; do
 done
 
 # Check data files
-for file in "$SHARE_LOCATION/jesd/jesd.glade" "$SHARE_LOCATION/jesd/ADIlogo.png"; do
+for file in "$SHARE_LOCATION/jesd-eye-scan-gtk/jesd.glade" "$SHARE_LOCATION/jesd-eye-scan-gtk/ADIlogo.png"; do
     if [ -e "$file" ]; then
         echo "[OK] $file exists"
     else

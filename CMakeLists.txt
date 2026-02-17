@@ -136,11 +136,11 @@ install(TARGETS ${JESD_STATUS_TARGET} ${JESD_EYE_SCAN_TARGET} ${JESD204_TOPOLOGY
 
 if(USE_JESD_EYE_SCAN)
     install(FILES jesd.glade
-        DESTINATION share/jesd/
+        DESTINATION share/jesd-eye-scan-gtk/
     )
 
     install(FILES icons/ADIlogo.png
-        DESTINATION share/jesd/
+        DESTINATION share/jesd-eye-scan-gtk/
     )
 
     # Configure desktop file with correct install prefix
