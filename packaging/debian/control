@@ -1,0 +1,19 @@
+Source: jesd-eye-scan-gtk
+Section: utils
+Priority: optional
+Maintainer: Analog Devices Inc <engineerzone@analog.com>
+Build-Depends: debhelper-compat (= 13), cmake, pkg-config, libgtk-3-dev, libncurses-dev, libiio-dev
+Standards-Version: 4.6.0
+Homepage: https://github.com/analogdevicesinc/jesd-eye-scan-gtk
+
+Package: jesd-eye-scan-gtk
+Architecture: @ARCHITECTURE@
+Depends: ${shlibs:Depends}, ${misc:Depends}, gnuplot
+Description: JESD204 Eye Scan Visualization Utility
+ A GTK3-based Linux application for visualizing and analyzing eye scan data
+ from JESD204 high-speed serial interfaces on Analog Devices hardware.
+ .
+ This package provides:
+  - jesd_eye_scan: GTK3-based GUI for eye scan visualization
+  - jesd_status: NCurses-based terminal utility for JESD204 link monitoring
+  - jesd204_topology: JESD204 topology analysis tool
