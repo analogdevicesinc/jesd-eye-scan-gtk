@@ -143,7 +143,14 @@ if(USE_JESD_EYE_SCAN)
         DESTINATION share/jesd/
     )
 
-    install(FILES "jesd_eye_scan.desktop"
+    # Configure desktop file with correct install prefix
+    configure_file(
+        "${CMAKE_CURRENT_SOURCE_DIR}/jesd_eye_scan.desktop.in"
+        "${CMAKE_CURRENT_BINARY_DIR}/jesd_eye_scan.desktop"
+        @ONLY
+    )
+
+    install(FILES "${CMAKE_CURRENT_BINARY_DIR}/jesd_eye_scan.desktop"
         DESTINATION share/applications/
     )
 endif()

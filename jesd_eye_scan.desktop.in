@@ -1,8 +1,8 @@
 
 [Desktop Entry]
 Type=Application
-Exec=/usr/local/bin/jesd_eye_scan
-Icon=/usr/local/share/jesd/ADIlogo.png
+Exec=@CMAKE_INSTALL_PREFIX@/bin/jesd_eye_scan
+Icon=@CMAKE_INSTALL_PREFIX@/share/jesd/ADIlogo.png
 Hidden=false
 NoDisplay=false
 Name[C]=jesd_eye_scan
