@@ -1,7 +1,7 @@
 Source: jesd-eye-scan-gtk
 Section: utils
 Priority: optional
-Maintainer: Analog Devices Inc <engineerzone@analog.com>
+Maintainer: Engineerzone <https://ez.analog.com/sw-interface-tools>
 Build-Depends: debhelper-compat (= 13), cmake, pkg-config, libgtk-3-dev, libncurses-dev, libiio-dev
 Standards-Version: 4.6.0
 Homepage: https://github.com/analogdevicesinc/jesd-eye-scan-gtk
