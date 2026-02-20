@@ -5,14 +5,15 @@ version=$1
 architecture=$(dpkg --print-architecture)
 source_code=$(basename "$PWD")
 
-# Install dependencies based on user (root or non-root)
+# Use sudo only if not running as root
 if [ "$(id -u)" -eq 0 ]; then
-    apt-get update
-    apt-get install -y build-essential cmake pkg-config libgtk-3-dev libncurses-dev devscripts debhelper libiio-dev 
+    SUDO=""
 else
-    sudo apt-get update
-    sudo apt-get install -y build-essential cmake pkg-config libgtk-3-dev libncurses-dev devscripts debhelper libiio-dev
+    SUDO="sudo"
 fi
+
+$SUDO apt-get update
+$SUDO apt-get install -y build-essential cmake pkg-config libgtk-3-dev libncurses-dev devscripts debhelper libiio-dev
 
 # Update version and architecture in debian files
 sed -i "s/@VERSION@/$version-1/" packaging/debian/changelog
