@@ -2,7 +2,6 @@
 set -e
 
 version=$1
-architecture=$(dpkg --print-architecture)
 source_code=$(basename "$PWD")
 
 # Use sudo only if not running as root
@@ -15,10 +14,9 @@ fi
 $SUDO apt-get update
 $SUDO apt-get install -y build-essential cmake pkg-config libgtk-3-dev libncurses-dev devscripts debhelper libiio-dev
 
-# Update version and architecture in debian files
+# Update version in debian files
 sed -i "s/@VERSION@/$version-1/" packaging/debian/changelog
 sed -i "s/@DATE@/$(date -R)/" packaging/debian/changelog
-sed -i "s/@ARCHITECTURE@/$architecture/" packaging/debian/control
 
 # Copy debian directory to source root
 cp -r packaging/debian .
