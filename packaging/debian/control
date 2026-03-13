@@ -7,7 +7,7 @@ Standards-Version: 4.6.0
 Homepage: https://github.com/analogdevicesinc/jesd-eye-scan-gtk
 
 Package: jesd-eye-scan-gtk
-Architecture: @ARCHITECTURE@
+Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, gnuplot
 Description: JESD204 Eye Scan Visualization Utility
  A GTK3-based Linux application for visualizing and analyzing eye scan data

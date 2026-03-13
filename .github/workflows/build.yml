@@ -25,7 +25,7 @@ jobs:
       app-version: ${{ steps.set_version.outputs.version }}
     steps:
     - name: Checkout code repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
     - name: Set app version
       id: set_version
       run: |
@@ -66,7 +66,7 @@ jobs:
 
     steps:
     - name: Checkout code repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         path: ${{env.APP_NAME}}
 
@@ -97,7 +97,7 @@ jobs:
         ls -la ./artifacts/
 
     - name: Upload debian artifacts to github
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ${{env.APP_NAME}}-${{matrix.distro}}-${{matrix.architecture}}
         path: |
@@ -117,7 +117,7 @@ jobs:
         working-directory: ${{env.APP_NAME}}
     steps:
     - name: Checkout code repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v6
       with:
         path: ${{env.APP_NAME}}
 
@@ -141,7 +141,7 @@ jobs:
         ls -la artifacts/
 
     - name: Upload debian artifacts to github
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: ${{env.APP_NAME}}-ubuntu
         path: |
