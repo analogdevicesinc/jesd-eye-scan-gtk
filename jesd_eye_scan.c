@@ -1417,7 +1417,12 @@ int main(int argc, char *argv[])
 	builder = gtk_builder_new();
 
 	if (!gtk_builder_add_from_file(builder, "./jesd.glade", NULL)) {
-		gtk_builder_add_from_file(builder, "/usr/local/share/jesd/jesd.glade", NULL);
+		if (!gtk_builder_add_from_file(builder, "/usr/local/share/jesd-eye-scan-gtk/jesd.glade", NULL)) {
+			if (!gtk_builder_add_from_file(builder, "/usr/share/jesd-eye-scan-gtk/jesd.glade", NULL)) {
+				fprintf(stderr, "Error: Could not load jesd.glade\n");
+				return EXIT_FAILURE;
+			}
+		}
 	}
 
 	main_window = GTK_WIDGET(gtk_builder_get_object(builder, "window1"));
@@ -1523,8 +1528,10 @@ int main(int argc, char *argv[])
 
 	if (!stat("./icons/ADIlogo.png", &buf)) {
 		g_object_set(logo, "file", "./icons/ADIlogo.png", NULL);
+	} else if (!stat("/usr/local/share/jesd-eye-scan-gtk/ADIlogo.png", &buf)) {
+		g_object_set(logo, "file", "/usr/local/share/jesd-eye-scan-gtk/ADIlogo.png", NULL);
 	} else {
-		g_object_set(logo, "file", "/usr/local/share/jesd/ADIlogo.png", NULL);
+		g_object_set(logo, "file", "/usr/share/jesd-eye-scan-gtk/ADIlogo.png", NULL);
 	}
 
 	gtk_widget_show_all(main_window);
