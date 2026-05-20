@@ -46,7 +46,7 @@ int jesd_find_devices(const char *basedir, const char *driver, const char *file_
 	dr = opendir(path);
 	if (dr == NULL) {
 		fprintf(stderr, "Could not open current directory\n");
-		return 0;
+		return num;
 	}
 
 	while ((de = readdir(dr)) != NULL) {
