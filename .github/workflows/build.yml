@@ -2,9 +2,6 @@ name: Build and Deploy JESD Eye Scan GTK
 permissions:
   contents: read
 
-permissions:
-  contents: read
-
 env:
   APP_NAME: jesd-eye-scan-gtk
 
