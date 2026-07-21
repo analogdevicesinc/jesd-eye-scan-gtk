@@ -8,7 +8,7 @@
 
 cmake_minimum_required(VERSION 3.10)
 # Default version
-set(DEFAULT_PROJECT_VERSION "1.0.0")
+set(DEFAULT_PROJECT_VERSION "0.3.0")
 # Use provided version, or default
 if(NOT DEFINED PROJECT_VERSION)
     set(PROJECT_VERSION "${DEFAULT_PROJECT_VERSION}" CACHE STRING "Full project version (MAJOR.MINOR.PATCH)")
