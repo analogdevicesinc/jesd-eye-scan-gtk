@@ -46,7 +46,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - docker_image: aandrisa/kuiper_basic_64:latest
+          - docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_64:latest
             distro: kuiper
             architecture: arm64
             platform_flag: ""
@@ -54,7 +54,7 @@ jobs:
             distro: debian13
             architecture: arm64
             platform_flag: ""
-          - docker_image: aandrisa/kuiper_basic_32:latest
+          - docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_32:latest
             distro: kuiper
             architecture: armhf
             platform_flag: "--platform linux/arm/v7"
