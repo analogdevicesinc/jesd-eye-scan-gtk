@@ -4,11 +4,11 @@ Upstream-Contact: EngineerZone <https://ez.analog.com/sw-interface-tools/>
 Source: https://github.com/analogdevicesinc/jesd-eye-scan-gtk
 
 Files: *
-Copyright: 2014-2025 Analog Devices, Inc.
-License: ADIBSD
+Copyright: 2014-2025, Analog Devices, Inc.
+License: ADI-BSD-5-Clause
 
-License: ADIBSD
- SPDX short identifier: ADIBSD
+License: ADI-BSD-5-Clause
+ All rights reserved.
  .
  Redistribution and use in source and binary forms, with or without modification,
  are permitted provided that the following conditions are met:
