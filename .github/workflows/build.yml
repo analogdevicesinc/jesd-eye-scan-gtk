@@ -69,22 +69,34 @@ jobs:
       with:
         path: ${{env.APP_NAME}}
 
+    - name: Checkout deb-generator-action
+      uses: actions/checkout@v6
+      with:
+        repository: analogdevicesinc/shared-actions
+        path: shared-actions
+
     - name: Start persistent container
       run: |
         docker run -d \
             ${{matrix.platform_flag}} \
             --name ${{matrix.distro}}-${{matrix.architecture}} \
             -v "$GITHUB_WORKSPACE/${{env.APP_NAME}}:/workspace/${{env.APP_NAME}}" \
+            -v "$GITHUB_WORKSPACE/shared-actions/deb-generator-action:/deb-generator-action" \
             -w /workspace/${{env.APP_NAME}} \
             ${{matrix.docker_image}} tail -f /dev/null
 
     - name: Create debian package
       run: |
-        docker exec ${{matrix.distro}}-${{matrix.architecture}} sh -c ".github/scripts/create_debian.sh ${{needs.identify_version.outputs.app-version}}"
+        docker exec \
+            -e VERSION=${{needs.identify_version.outputs.app-version}} \
+            -e WORKING_DIRECTORY=/workspace/${{env.APP_NAME}} \
+            -e CONTROL_PATH=packaging/debian \
+            ${{matrix.distro}}-${{matrix.architecture}} \
+            bash /deb-generator-action/build-deb.sh
 
     - name: Install application
       run: |
-        docker exec ${{matrix.distro}}-${{matrix.architecture}} sh -c "apt-get install -y gnuplot && dpkg -i ../${{env.APP_NAME}}_${{needs.identify_version.outputs.app-version}}-1_${{matrix.architecture}}.deb"
+        docker exec ${{matrix.distro}}-${{matrix.architecture}} sh -c "apt-get install -y gnuplot && dpkg -i artifacts/${{env.APP_NAME}}_${{needs.identify_version.outputs.app-version}}-1_${{matrix.architecture}}.deb"
 
     - name: Verify install locations
       run: |
@@ -92,7 +104,7 @@ jobs:
 
     - name: Copy debian artifacts from container to host
       run: |
-        docker cp ${{matrix.distro}}-${{matrix.architecture}}:/workspace/. ./artifacts/
+        docker cp ${{matrix.distro}}-${{matrix.architecture}}:/workspace/${{env.APP_NAME}}/artifacts/. ./artifacts/
         ls -la ./artifacts/
 
     - name: Upload debian artifacts to github
@@ -121,13 +133,16 @@ jobs:
         path: ${{env.APP_NAME}}
 
     - name: Create .deb package
-      run: |
-        .github/scripts/create_debian.sh ${{needs.identify_version.outputs.app-version}}
+      id: create_deb
+      uses: analogdevicesinc/shared-actions/deb-generator-action@main
+      with:
+        version: ${{needs.identify_version.outputs.app-version}}
+        working-directory: ${{env.APP_NAME}}
 
     - name: Install application
       run: |
         sudo apt-get install -y gnuplot
-        sudo dpkg -i ../${{env.APP_NAME}}_${{needs.identify_version.outputs.app-version}}-1_${{env.architecture}}.deb
+        sudo dpkg -i ${{ steps.create_deb.outputs.artifact-dir }}/${{env.APP_NAME}}_${{needs.identify_version.outputs.app-version}}-1_${{env.architecture}}.deb
 
     - name: Verify install locations
       run: |
@@ -136,7 +151,7 @@ jobs:
     - name: Copy debian artifacts
       run: |
         mkdir -p artifacts
-        cp ../*.deb ../*.dsc ../*.debian.tar.xz ../*.orig.tar.gz artifacts/
+        cp ${{ steps.create_deb.outputs.artifact-dir }}/*.deb ${{ steps.create_deb.outputs.artifact-dir }}/*.dsc ${{ steps.create_deb.outputs.artifact-dir }}/*.debian.tar.xz ${{ steps.create_deb.outputs.artifact-dir }}/*.orig.tar.gz artifacts/
         ls -la artifacts/
 
     - name: Upload debian artifacts to github
