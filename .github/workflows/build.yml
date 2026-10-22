@@ -46,20 +46,12 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_64:latest
+          - docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_64@sha256:2a4b203ca34cf660339f8d8a5b32d290ae3c4918e18c0473902e2c12c86ca129 # latest
             distro: kuiper
             architecture: arm64
             platform_flag: ""
-          - docker_image: arm64v8/debian:trixie
-            distro: debian13
-            architecture: arm64
-            platform_flag: ""
-          - docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_32:latest
+          - docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_32@sha256:ce9c5eba9dc120595e42142665aa11ded7317181c01c14c190e86835cfef9c8a # latest
             distro: kuiper
-            architecture: armhf
-            platform_flag: "--platform linux/arm/v7"
-          - docker_image: arm32v7/debian:trixie
-            distro: debian13
             architecture: armhf
             platform_flag: "--platform linux/arm/v7"
 
