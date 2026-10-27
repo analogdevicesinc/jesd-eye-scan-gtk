@@ -39,19 +39,33 @@ jobs:
         echo "Version to use: $cmake_version"
         echo "version=$cmake_version" >> "$GITHUB_OUTPUT"
 
-  build_arm_native:
-    runs-on: ubuntu-24.04-arm
+  build_containerized:
+    runs-on: ${{matrix.runner}}
     needs: identify_version
+    env:
+      CONTAINER: ${{matrix.distro}}-${{matrix.architecture}}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_64@sha256:2a4b203ca34cf660339f8d8a5b32d290ae3c4918e18c0473902e2c12c86ca129 # latest
+          - runner: ubuntu-24.04-arm
+            docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_64:latest
             distro: kuiper
             architecture: arm64
             platform_flag: ""
-          - docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_32@sha256:ce9c5eba9dc120595e42142665aa11ded7317181c01c14c190e86835cfef9c8a # latest
+          - runner: ubuntu-24.04-arm
+            docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_32:latest
             distro: kuiper
+            architecture: armhf
+            platform_flag: "--platform linux/arm/v7"
+          - runner: ubuntu-26.04-arm
+            docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_64:latest
+            distro: debian
+            architecture: arm64
+            platform_flag: ""
+          - runner: ubuntu-26.04-arm
+            docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_32:latest
+            distro: debian
             architecture: armhf
             platform_flag: "--platform linux/arm/v7"
 
@@ -71,7 +85,7 @@ jobs:
       run: |
         docker run -d \
             ${{matrix.platform_flag}} \
-            --name ${{matrix.distro}}-${{matrix.architecture}} \
+            --name $CONTAINER \
             -v "$GITHUB_WORKSPACE/${{env.APP_NAME}}:/workspace/${{env.APP_NAME}}" \
             -v "$GITHUB_WORKSPACE/shared-actions/deb-generator-action:/deb-generator-action" \
             -w /workspace/${{env.APP_NAME}} \
@@ -83,20 +97,20 @@ jobs:
             -e VERSION=${{needs.identify_version.outputs.app-version}} \
             -e WORKING_DIRECTORY=/workspace/${{env.APP_NAME}} \
             -e CONTROL_PATH=packaging/debian \
-            ${{matrix.distro}}-${{matrix.architecture}} \
+            $CONTAINER \
             bash /deb-generator-action/build-deb.sh
 
     - name: Install application
       run: |
-        docker exec ${{matrix.distro}}-${{matrix.architecture}} sh -c "apt-get install -y gnuplot && dpkg -i artifacts/${{env.APP_NAME}}_${{needs.identify_version.outputs.app-version}}-1_${{matrix.architecture}}.deb"
+        docker exec $CONTAINER sh -c "apt-get install -y gnuplot && dpkg -i artifacts/*.deb"
 
     - name: Verify install locations
       run: |
-        docker exec ${{matrix.distro}}-${{matrix.architecture}} sh -c ".github/scripts/verify_install.sh"
+        docker exec $CONTAINER sh -c ".github/scripts/verify_install.sh"
 
     - name: Copy debian artifacts from container to host
       run: |
-        docker cp ${{matrix.distro}}-${{matrix.architecture}}:/workspace/${{env.APP_NAME}}/artifacts/. ./artifacts/
+        docker cp $CONTAINER:/workspace/${{env.APP_NAME}}/artifacts/. ./artifacts/
         ls -la ./artifacts/
 
     - name: Upload debian artifacts to github
@@ -110,11 +124,19 @@ jobs:
           artifacts/*.orig.tar.gz
         if-no-files-found: error
 
-  build_ubuntu:
-    runs-on: ubuntu-latest
+  build_native:
+    runs-on: ${{matrix.runner}}
     needs: identify_version
-    env:
-      architecture: amd64
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-latest
+            distro: ubuntu-26.04
+            architecture: amd64
+          - runner: ubuntu-24.04
+            distro: ubuntu-24.04
+            architecture: amd64
     defaults:
       run:
         working-directory: ${{env.APP_NAME}}
@@ -134,7 +156,7 @@ jobs:
     - name: Install application
       run: |
         sudo apt-get install -y gnuplot
-        sudo dpkg -i ${{ steps.create_deb.outputs.artifact-dir }}/${{env.APP_NAME}}_${{needs.identify_version.outputs.app-version}}-1_${{env.architecture}}.deb
+        sudo dpkg -i ${{ steps.create_deb.outputs.artifact-dir }}/*.deb
 
     - name: Verify install locations
       run: |
@@ -149,7 +171,7 @@ jobs:
     - name: Upload debian artifacts to github
       uses: actions/upload-artifact@v7
       with:
-        name: ${{env.APP_NAME}}-ubuntu
+        name: ${{env.APP_NAME}}-${{matrix.distro}}-${{matrix.architecture}}
         path: |
           ${{env.APP_NAME}}/artifacts/*.deb
           ${{env.APP_NAME}}/artifacts/*.dsc
