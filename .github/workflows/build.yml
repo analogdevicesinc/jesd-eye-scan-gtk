@@ -59,12 +59,12 @@ jobs:
             architecture: armhf
             platform_flag: "--platform linux/arm/v7"
           - runner: ubuntu-26.04-arm
-            docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_64:latest
+            docker_image: debian:latest
             distro: debian
             architecture: arm64
             platform_flag: ""
           - runner: ubuntu-26.04-arm
-            docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_32:latest
+            docker_image: debian:latest
             distro: debian
             architecture: armhf
             platform_flag: "--platform linux/arm/v7"
@@ -90,6 +90,11 @@ jobs:
             -v "$GITHUB_WORKSPACE/shared-actions/deb-generator-action:/deb-generator-action" \
             -w /workspace/${{env.APP_NAME}} \
             ${{matrix.docker_image}} tail -f /dev/null
+
+    - name: Install container prerequisites
+      run: |
+        # build-deb.sh curls the ADI package feed; plain debian images lack curl.
+        docker exec $CONTAINER sh -c "apt-get update -qq && apt-get install -y -qq curl ca-certificates"
 
     - name: Create debian package
       run: |
@@ -131,7 +136,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - runner: ubuntu-latest
+          - runner: ubuntu-26.04
             distro: ubuntu-26.04
             architecture: amd64
           - runner: ubuntu-24.04
