@@ -20,7 +20,7 @@ if (DEBBUILD_CMD)
     set(CPACK_DEBIAN_PACKAGE_DEPENDS "libgtk-3-0, libncurses6, gnuplot")
     
     # Package metadata
-    set(CPACK_PACKAGE_CONTACT "Engineerzone <https://ez.analog.com/sw-interface-tools>")
+    set(CPACK_PACKAGE_CONTACT "Engineerzone <linux@analog.com>")
     set(CPACK_DEBIAN_PACKAGE_DESCRIPTION "Eye Scan Visualization Utility")
     set(CPACK_DEBIAN_PACKAGE_SECTION "utils")
     if(DEFINED ARCHITECTURE)
