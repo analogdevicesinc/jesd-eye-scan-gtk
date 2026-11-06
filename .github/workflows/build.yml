@@ -28,7 +28,7 @@ jobs:
       app-version: ${{ steps.set_version.outputs.version }}
     steps:
     - name: Checkout code repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
     - name: Set app version
       id: set_version
       run: |
@@ -53,12 +53,12 @@ jobs:
       matrix:
         include:
           - runner: ubuntu-24.04-arm
-            docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_64:latest
+            docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_64@sha256:2a4b203ca34cf660339f8d8a5b32d290ae3c4918e18c0473902e2c12c86ca129
             distro: kuiper
             architecture: arm64
             platform_flag: ""
           - runner: ubuntu-24.04-arm
-            docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_32:latest
+            docker_image: docker.cloudsmith.io/adi/containers/kuiper_basic_32@sha256:ce9c5eba9dc120595e42142665aa11ded7317181c01c14c190e86835cfef9c8a
             distro: kuiper
             architecture: armhf
             platform_flag: "--platform linux/arm/v7"
@@ -75,14 +75,15 @@ jobs:
 
     steps:
     - name: Checkout code repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       with:
         path: ${{env.APP_NAME}}
 
     - name: Checkout deb-generator-action
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       with:
         repository: analogdevicesinc/shared-actions
+        ref: 114160b9f6dc3d27707d8acc8d3eee31714c0548 # main
         path: shared-actions
 
     - name: Start persistent container
@@ -123,7 +124,7 @@ jobs:
         ls -la ./artifacts/
 
     - name: Upload debian artifacts to github
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: ${{env.APP_NAME}}-${{matrix.distro}}-${{matrix.architecture}}
         path: |
@@ -151,13 +152,13 @@ jobs:
         working-directory: ${{env.APP_NAME}}
     steps:
     - name: Checkout code repository
-      uses: actions/checkout@v6
+      uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
       with:
         path: ${{env.APP_NAME}}
 
     - name: Create .deb package
       id: create_deb
-      uses: analogdevicesinc/shared-actions/deb-generator-action@main
+      uses: analogdevicesinc/shared-actions/deb-generator-action@114160b9f6dc3d27707d8acc8d3eee31714c0548 # main
       with:
         version: ${{needs.identify_version.outputs.app-version}}
         working-directory: ${{env.APP_NAME}}
@@ -178,7 +179,7 @@ jobs:
         ls -la artifacts/
 
     - name: Upload debian artifacts to github
-      uses: actions/upload-artifact@v7
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: ${{env.APP_NAME}}-${{matrix.distro}}-${{matrix.architecture}}
         path: |
